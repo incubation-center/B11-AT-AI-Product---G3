@@ -1,7 +1,7 @@
 import Hero from "@/components/Hero";
 import Features from "@/components/Features";
 import SocialProof from "@/components/SocialProof";
-import CTABanner from "@/components/CTABanner";
+
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -10,7 +10,6 @@ export default function Home() {
       <Hero />
       <Features />
       <SocialProof />
-      <CTABanner />
       <Footer />
     </div>
   );
