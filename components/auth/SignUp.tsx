@@ -2,59 +2,108 @@
 
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import AuthPageShell from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { authClient } from "@/lib/auth-client";
+import { signUpSchema } from "@/lib/zod";
 
 type SignUpErrors = {
   fullName?: string;
   email?: string;
   password?: string;
   confirmPassword?: string;
-  terms?: string;
+  general?: string;
 };
 
-function getPasswordStrength(password: string) {
-  let score = 0;
-  if (password.length >= 8) score += 1;
-  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-  return score;
-}
+const getErrorMessage = (error: unknown) => {
+  if (!error) return null;
+  if (typeof error === "string") return error;
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && "message" in error) {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) {
+      return maybeMessage;
+    }
+  }
+  return null;
+};
 
 export default function SignUp() {
+  const router = useRouter();
   const [fullName, setFullName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
-  const [acceptedTerms, setAcceptedTerms] = React.useState(false);
   const [errors, setErrors] = React.useState<SignUpErrors>({});
-  const strength = getPasswordStrength(password);
-
+  const [isLoading, setIsLoading] = React.useState(false);
   const validate = () => {
     const nextErrors: SignUpErrors = {};
-    if (!fullName.trim()) nextErrors.fullName = "Full name is required";
-    if (!email.trim()) nextErrors.email = "Email is required";
-    if (!email.includes("@")) nextErrors.email = "Enter a valid email address";
-    if (!password) nextErrors.password = "Password is required";
-    if (password && password.length < 8) {
-      nextErrors.password = "Password must be at least 8 characters";
+    const parsed = signUpSchema.safeParse({
+      name: fullName,
+      email,
+      password,
+      confirmPassword,
+    });
+
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0];
+        if (field === "name" && !nextErrors.fullName) {
+          nextErrors.fullName = issue.message;
+        }
+        if (field === "email" && !nextErrors.email) {
+          nextErrors.email = issue.message;
+        }
+        if (field === "password" && !nextErrors.password) {
+          nextErrors.password = issue.message;
+        }
+        if (field === "confirmPassword" && !nextErrors.confirmPassword) {
+          nextErrors.confirmPassword = issue.message;
+        }
+      }
     }
-    if (!confirmPassword) {
-      nextErrors.confirmPassword = "Please confirm your password";
-    } else if (confirmPassword !== password) {
-      nextErrors.confirmPassword = "Passwords do not match";
-    }
-    if (!acceptedTerms) nextErrors.terms = "You must accept terms to continue";
+
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
-  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    validate();
+
+    if (!validate()) return;
+
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      const { error } = await authClient.signUp.email({
+        email,
+        password,
+        name: fullName,
+      });
+
+      if (error) {
+        setErrors({
+          general:
+            getErrorMessage(error) ||
+            "Unable to create account right now. Please try again.",
+        });
+        return;
+      }
+
+      router.push("/verify-email");
+      router.refresh();
+    } catch (err) {
+      setErrors({
+        general:
+          getErrorMessage(err) || "Something went wrong. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,6 +116,12 @@ export default function SignUp() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
       >
+        {errors.general && (
+          <div className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            {errors.general}
+          </div>
+        )}
+
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
           <div className="space-y-2">
             <label htmlFor="fullName" className="text-sm font-medium">
@@ -77,6 +132,7 @@ export default function SignUp() {
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
               placeholder="John Doe"
+              disabled={isLoading}
             />
             {errors.fullName ? (
               <p className="text-sm text-destructive">{errors.fullName}</p>
@@ -93,6 +149,7 @@ export default function SignUp() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="you@example.com"
+              disabled={isLoading}
             />
             {errors.email ? (
               <p className="text-sm text-destructive">{errors.email}</p>
@@ -108,25 +165,9 @@ export default function SignUp() {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Create a strong password"
+              disabled={isLoading}
+              placeholder="Create a password"
             />
-            <div className="grid grid-cols-4 gap-1">
-              {Array.from({ length: 4 }).map((_, index) => {
-                const active = index < strength;
-                const shade =
-                  index === 0
-                    ? "bg-destructive"
-                    : index < 3
-                      ? "bg-amber-500"
-                      : "bg-emerald-500";
-                return (
-                  <span
-                    key={index}
-                    className={`h-1.5 rounded-full ${active ? shade : "bg-muted"}`}
-                  />
-                );
-              })}
-            </div>
             {errors.password ? (
               <p className="text-sm text-destructive">{errors.password}</p>
             ) : null}
@@ -140,6 +181,7 @@ export default function SignUp() {
               id="confirmPassword"
               type="password"
               value={confirmPassword}
+              disabled={isLoading}
               onChange={(event) => setConfirmPassword(event.target.value)}
               placeholder="Re-enter your password"
             />
@@ -148,41 +190,18 @@ export default function SignUp() {
             ) : null}
           </div>
 
-          <div className="space-y-2">
-            <label className="flex items-start gap-2 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={acceptedTerms}
-                onChange={(event) => setAcceptedTerms(event.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-input"
-              />
-              <span>
-                I agree to the{" "}
-                <Link href="#" className="text-accent hover:underline">
-                  Terms of Service
-                </Link>{" "}
-                and{" "}
-                <Link href="#" className="text-accent hover:underline">
-                  Privacy Policy
-                </Link>
-              </span>
-            </label>
-            {errors.terms ? (
-              <p className="text-sm text-destructive">{errors.terms}</p>
-            ) : null}
-          </div>
-
           <Button
             type="submit"
             className="w-full rounded-md bg-accent text-accent-foreground transition hover:opacity-90"
+            disabled={isLoading}
           >
-            Create Account
+            {isLoading ? "Creating account..." : "Create Account"}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/login" className="text-accent hover:underline">
+          <Link href="/sign-in" className="text-accent hover:underline">
             Sign in
           </Link>
         </p>

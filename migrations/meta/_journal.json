@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1773124676586,
+      "tag": "0000_majestic_piledriver",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773146292361,
+      "tag": "0001_quiet_yellowjacket",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773151129541,
+      "tag": "0002_icy_warhawk",
+      "breakpoints": true
+    }
+  ]
+}
