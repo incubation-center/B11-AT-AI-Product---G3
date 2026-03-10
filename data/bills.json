@@ -1,0 +1,26 @@
+{
+  "records": [
+    {
+      "id": "ec5a71ea-c1f2-4aa8-abc4-34d8a5204ff4",
+      "userId": "demo-user",
+      "serviceName": "Acme Internet",
+      "billDate": "2026-03-10",
+      "dueDate": null,
+      "amount": 75,
+      "usage": 600,
+      "sourceDocumentId": null,
+      "createdAt": "2026-03-10T03:38:37.125Z"
+    },
+    {
+      "id": "b3f60774-5dc4-4290-aadf-534dc254d135",
+      "userId": "demo-user",
+      "serviceName": "Acme Internet",
+      "billDate": "2026-03-10",
+      "dueDate": null,
+      "amount": 75,
+      "usage": 600,
+      "sourceDocumentId": null,
+      "createdAt": "2026-03-10T07:22:08.813Z"
+    }
+  ]
+}

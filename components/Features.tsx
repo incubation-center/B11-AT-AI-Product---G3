@@ -43,7 +43,7 @@ function FeatureCard({
       className="rounded-2xl border border-border bg-card p-8 shadow-sm transition-all hover:shadow-md"
     >
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent/10">
-        <feature.icon className="h-7 w-7 text-accent" strokeWidth={2} />
+        <feature.icon className="h-7 w-7 text-foreground" strokeWidth={2} />
       </div>
       <h3 className="font-display mb-2 text-2xl">{feature.title}</h3>
       <p className="text-muted-foreground leading-relaxed">

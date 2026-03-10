@@ -1,36 +1,115 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Core API Demo (RAG)
 
-## Getting Started
+This repo now includes API endpoints for a Postman-first AI core demo:
 
-First, run the development server:
+- `POST /api/ingest`
+- `POST /api/extract`
+- `POST /api/detect-anomaly`
+- `POST /api/execute`
+
+All endpoints return strict JSON only.
+
+## 1. Setup
+
+1. Add `GEMINI_API_KEY` to `.env`.
+2. Run:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 2. Endpoint Specs
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### `POST /api/ingest`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`multipart/form-data`:
 
-## Learn More
+- `file` (required): PDF, PNG, JPEG, WEBP, or TXT
+- `user_id` (optional, default `demo-user`)
+- `service_name` (optional; required if `doc_type=bill` to build history)
+- `category_hint` (optional)
+- `doc_type` (optional: `contract`, `bill`, `other`; default `contract`)
 
-To learn more about Next.js, take a look at the following resources:
+Example flow:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Upload service contract (`doc_type=contract`)
+2. Upload historical bill #1 (`doc_type=bill`, `service_name=...`)
+3. Upload historical bill #2 (`doc_type=bill`, `service_name=...`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### `POST /api/extract`
 
-## Deploy on Vercel
+`application/json`:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```json
+{
+  "user_id": "demo-user",
+  "service_name": "Acme Internet",
+  "doc_type": "contract"
+}
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Response shape:
+
+```json
+{
+  "category": "Utility",
+  "next_due_date": "2026-03-25",
+  "amount": 149.99,
+  "notice_period": "30 days written notice",
+  "penalty_rules": ["Late fee 5%", "Auto-renewal lock-in 12 months"],
+  "hidden_rules": ["Price may increase after promo period"],
+  "evidence": ["..."]
+}
+```
+
+### `POST /api/detect-anomaly`
+
+`application/json`:
+
+```json
+{
+  "user_id": "demo-user",
+  "service_name": "Acme Internet",
+  "current_amount": 400,
+  "current_usage": 980,
+  "bill_date": "2026-03-09",
+  "persist_current": true
+}
+```
+
+This compares current bill vs historical records in `data/bills.json` and uses contract RAG evidence to classify likely cause:
+
+- `usage_based`
+- `rate_change`
+- `unknown`
+
+### `POST /api/execute`
+
+`application/json`:
+
+```json
+{
+  "user_id": "demo-user",
+  "service_name": "Acme Internet",
+  "user_request": "Please cancel this service and make a letter",
+  "findings": {
+    "anomaly": true,
+    "wants_termination": true
+  }
+}
+```
+
+Dispatches OpenClaw-style actions:
+
+- `just-fucking-cancel`
+- `ai-pdf-builder`
+
+## 3. Demo Script For Thursday
+
+1. `POST /api/ingest` contract
+2. `POST /api/ingest` 2 old bills
+3. `POST /api/extract` hidden rules + due date + penalties
+4. `POST /api/detect-anomaly` with high current bill (example: `200 -> 400`)
+5. `POST /api/execute` to auto-trigger cancellation and/or dispute letter
+
+This demonstrates full RAG architecture: Ingest -> Index -> Retrieve -> Generate.

@@ -1,0 +1,35 @@
+{
+  "records": [
+    {
+      "id": "6aa450ce-f0f6-4324-b2f1-becfa0aa168d",
+      "createdAt": "2026-03-10T03:40:18.458Z",
+      "payload": {
+        "execution_id": "a8dc2c0d-7dc5-4c9f-a5ad-e917acf4f855",
+        "actions": [
+          {
+            "skill": "just-fucking-cancel",
+            "reason": "User intent indicates service termination.",
+            "payload": {
+              "user_id": "demo-user",
+              "service_name": "Acme Internet"
+            }
+          },
+          {
+            "skill": "ai-pdf-builder",
+            "reason": "Generate cancellation letter.",
+            "payload": {
+              "document_type": "cancellation_letter",
+              "user_id": "demo-user",
+              "service_name": "Acme Internet",
+              "findings": {
+                "anomaly": true,
+                "wants_termination": true
+              }
+            }
+          }
+        ],
+        "status": "queued"
+      }
+    }
+  ]
+}
