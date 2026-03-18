@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import {
   appendBillRecord,
   generateStrictJson,
   parseLikelyDate,
   readBillRecords,
   semanticSearch,
+  type InvoiceType,
 } from "@/lib/ai/rag-core";
 
 type DetectBody = {
@@ -14,6 +17,7 @@ type DetectBody = {
   current_usage?: number | null;
   bill_date?: string;
   due_date?: string | null;
+  invoice_type?: InvoiceType;
   persist_current?: boolean;
 };
 
@@ -29,10 +33,21 @@ type AnomalyOutput = {
 
 export const dynamic = "force-dynamic";
 
+async function resolveUserId(bodyUserId?: string): Promise<string | null> {
+  if (bodyUserId) return bodyUserId;
+
+  const hdrs = await headers();
+  const headerUserId = hdrs.get("x-user-id");
+  if (headerUserId) return headerUserId;
+
+  const session = await auth.api.getSession({ headers: hdrs });
+  return session?.user?.id ?? null;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Partial<DetectBody>;
-    const userId = body.user_id;
+    const userId = await resolveUserId(body.user_id);
     const serviceName = body.service_name;
     const currentAmount = body.current_amount;
 
@@ -48,7 +63,8 @@ export async function POST(request: Request) {
       .filter(
         (row) =>
           row.userId === userId &&
-          row.serviceName.toLowerCase() === serviceName.toLowerCase(),
+          row.serviceName.toLowerCase() === serviceName.toLowerCase() &&
+          row.isRecurring,
       )
       .sort((a, b) => a.billDate.localeCompare(b.billDate));
 
@@ -103,14 +119,23 @@ export async function POST(request: Request) {
     );
 
     if (body.persist_current) {
+      const invoiceType = body.invoice_type ?? "recurring";
       await appendBillRecord({
         id: crypto.randomUUID(),
         userId,
         serviceName,
-        billDate: parseLikelyDate(body.bill_date ?? "") ?? new Date().toISOString().slice(0, 10),
+        billDate:
+          parseLikelyDate(body.bill_date ?? "") ??
+          new Date().toISOString().slice(0, 10),
         dueDate: parseLikelyDate(body.due_date ?? ""),
         amount: currentAmount,
-        usage: typeof body.current_usage === "number" ? body.current_usage : null,
+        usage:
+          typeof body.current_usage === "number" ? body.current_usage : null,
+        isRecurring: invoiceType === "recurring",
+        invoiceType,
+        classificationReason: null,
+        classificationEvidence: [],
+        classificationConfidence: null,
         sourceDocumentId: null,
         createdAt: new Date().toISOString(),
       });

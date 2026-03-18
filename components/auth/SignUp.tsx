@@ -9,13 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { signUpSchema } from "@/lib/zod";
+import { toast } from "sonner";
 
 type SignUpErrors = {
   fullName?: string;
   email?: string;
   password?: string;
   confirmPassword?: string;
-  general?: string;
 };
 
 const getErrorMessage = (error: unknown) => {
@@ -86,21 +86,15 @@ export default function SignUp() {
       });
 
       if (error) {
-        setErrors({
-          general:
-            getErrorMessage(error) ||
-            "Unable to create account right now. Please try again.",
-        });
+        toast.error(getErrorMessage(error) || "Unable to create account right now. Please try again.");
         return;
       }
 
+      toast.success("Account created! Please check your email to verify.");
       router.push("/verify-email");
       router.refresh();
     } catch (err) {
-      setErrors({
-        general:
-          getErrorMessage(err) || "Something went wrong. Please try again.",
-      });
+      toast.error(getErrorMessage(err) || "Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -116,12 +110,6 @@ export default function SignUp() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
       >
-        {errors.general && (
-          <div className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-            {errors.general}
-          </div>
-        )}
-
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
           <div className="space-y-2">
             <label htmlFor="fullName" className="text-sm font-medium">

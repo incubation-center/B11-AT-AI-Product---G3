@@ -1,10 +1,196 @@
 {
   "records": [
     {
-      "id": "6aa450ce-f0f6-4324-b2f1-becfa0aa168d",
-      "createdAt": "2026-03-10T03:40:18.458Z",
+      "id": "eb8d0ec7-878f-48bb-98e8-e9d11ecc9ee7",
+      "createdAt": "2026-03-12T03:55:54.344Z",
       "payload": {
-        "execution_id": "a8dc2c0d-7dc5-4c9f-a5ad-e917acf4f855",
+        "execution_id": "020ebbab-b72b-4a6b-a31b-b72546025d7c",
+        "actions": [
+          {
+            "skill": "just-fucking-cancel",
+            "reason": "User intent indicates service termination.",
+            "payload": {
+              "user_id": "demo-user",
+              "service_name": "Acme Internet"
+            }
+          },
+          {
+            "skill": "ai-pdf-builder",
+            "reason": "Generate cancellation letter.",
+            "payload": {
+              "document_type": "cancellation_letter",
+              "user_id": "demo-user",
+              "service_name": "Acme Internet",
+              "findings": {
+                "anomaly": true,
+                "wants_termination": true
+              }
+            }
+          }
+        ],
+        "status": "queued"
+      }
+    },
+    {
+      "id": "772ef1cb-235d-40d9-8a87-157a80715477",
+      "createdAt": "2026-03-12T03:56:06.436Z",
+      "payload": {
+        "execution_id": "2d8e5142-07be-40a0-b539-09f4725223c7",
+        "actions": [
+          {
+            "skill": "just-fucking-cancel",
+            "reason": "User intent indicates service termination.",
+            "payload": {
+              "user_id": "demo-user",
+              "service_name": "Acme Internet"
+            }
+          },
+          {
+            "skill": "ai-pdf-builder",
+            "reason": "Generate cancellation letter.",
+            "payload": {
+              "document_type": "cancellation_letter",
+              "user_id": "demo-user",
+              "service_name": "Acme Internet",
+              "findings": {
+                "anomaly": true,
+                "wants_termination": true
+              }
+            }
+          }
+        ],
+        "status": "queued"
+      }
+    },
+    {
+      "id": "cd6574a7-4367-4271-95d5-4fa88e90172f",
+      "createdAt": "2026-03-12T03:59:42.052Z",
+      "payload": {
+        "execution_id": "1cec70cb-a1de-4035-b3f0-34829c29e5bd",
+        "actions": [
+          {
+            "skill": "just-fucking-cancel",
+            "reason": "User intent indicates service termination.",
+            "payload": {
+              "user_id": "demo-user",
+              "service_name": "Acme Internet"
+            }
+          },
+          {
+            "skill": "ai-pdf-builder",
+            "reason": "Generate cancellation letter.",
+            "payload": {
+              "document_type": "cancellation_letter",
+              "user_id": "demo-user",
+              "service_name": "Acme Internet",
+              "findings": {
+                "anomaly": true,
+                "wants_termination": true
+              }
+            }
+          }
+        ],
+        "status": "queued"
+      }
+    },
+    {
+      "id": "4e9a2889-8bf4-494c-8bad-cd802287585b",
+      "createdAt": "2026-03-12T07:14:17.965Z",
+      "payload": {
+        "execution_id": "e5bd77bd-65a2-4e6b-abf1-1b21b4d70c75",
+        "actions": [
+          {
+            "skill": "just-fucking-cancel",
+            "reason": "User intent indicates service termination.",
+            "payload": {
+              "user_id": "demo-user",
+              "service_name": "Acme Internet"
+            }
+          },
+          {
+            "skill": "ai-pdf-builder",
+            "reason": "Generate cancellation letter.",
+            "payload": {
+              "document_type": "cancellation_letter",
+              "user_id": "demo-user",
+              "service_name": "Acme Internet",
+              "findings": {
+                "anomaly": true,
+                "wants_termination": true
+              }
+            }
+          }
+        ],
+        "status": "queued"
+      }
+    },
+    {
+      "id": "cf5fd0de-88cc-436f-b859-2e5ea9893a47",
+      "createdAt": "2026-03-12T08:16:13.046Z",
+      "payload": {
+        "execution_id": "b64e51f1-978f-4231-94d0-4ee9a4a27911",
+        "actions": [
+          {
+            "skill": "just-fucking-cancel",
+            "reason": "User intent indicates service termination.",
+            "payload": {
+              "user_id": "demo-user",
+              "service_name": "Acme Internet"
+            }
+          },
+          {
+            "skill": "ai-pdf-builder",
+            "reason": "Generate cancellation letter.",
+            "payload": {
+              "document_type": "cancellation_letter",
+              "user_id": "demo-user",
+              "service_name": "Acme Internet",
+              "findings": {
+                "anomaly": true,
+                "wants_termination": true
+              }
+            }
+          }
+        ],
+        "status": "queued"
+      }
+    },
+    {
+      "id": "1cd10522-0bae-4b31-a1f0-b8e8b4a729e7",
+      "createdAt": "2026-03-12T08:54:42.555Z",
+      "payload": {
+        "execution_id": "1198149a-d70a-454b-95be-caf5717d11d2",
+        "actions": [
+          {
+            "skill": "just-fucking-cancel",
+            "reason": "User intent indicates service termination.",
+            "payload": {
+              "user_id": "demo-user",
+              "service_name": "Acme Internet"
+            }
+          },
+          {
+            "skill": "ai-pdf-builder",
+            "reason": "Generate cancellation letter.",
+            "payload": {
+              "document_type": "cancellation_letter",
+              "user_id": "demo-user",
+              "service_name": "Acme Internet",
+              "findings": {
+                "anomaly": true,
+                "wants_termination": true
+              }
+            }
+          }
+        ],
+        "status": "queued"
+      }
+    },
+    {
+      "id": "8b88fc57-c955-4965-96c2-a1a904bf6e5d",
+      "createdAt": "2026-03-12T09:13:58.270Z",
+      "payload": {
+        "execution_id": "f0cbf4e4-12de-49a9-b687-19c05f9ab097",
         "actions": [
           {
             "skill": "just-fucking-cancel",

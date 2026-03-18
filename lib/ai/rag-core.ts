@@ -2,8 +2,15 @@ import { randomUUID, createHash } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse/lib/pdf-parse") as (
+  buffer: Buffer,
+) => Promise<{ text: string }>;
+import mammoth from "mammoth";
 
 export type DocType = "contract" | "bill" | "other";
+export type InvoiceType = "recurring" | "one_time";
 
 export type VectorChunk = {
   id: string;
@@ -38,6 +45,11 @@ export type BillRecord = {
   dueDate: string | null;
   amount: number;
   usage: number | null;
+  isRecurring: boolean;
+  invoiceType: InvoiceType;
+  classificationReason: string | null;
+  classificationEvidence: string[];
+  classificationConfidence: number | null;
   sourceDocumentId: string | null;
   createdAt: string;
 };
@@ -68,6 +80,26 @@ function getGeminiClient(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(apiKey);
 }
 
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is missing");
+  }
+  // Use OpenRouter if the key starts with sk-or-v1
+  if (apiKey.startsWith("sk-or-v1")) {
+    return new OpenAI({
+      apiKey,
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        "HTTP-Referer":
+          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        "X-Title": "Bill Analysis App",
+      },
+    });
+  }
+  return new OpenAI({ apiKey });
+}
+
 async function ensureDataFiles() {
   await mkdir(DATA_DIR, { recursive: true });
 
@@ -86,6 +118,37 @@ async function ensureFile(filePath: string, defaultPayload: unknown) {
   }
 }
 
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 4): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const is503 =
+        msg.includes("503") ||
+        msg.includes("high demand") ||
+        msg.includes("overloaded");
+      const is429 = msg.includes("429") || msg.includes("Too Many Requests");
+      // "exceeded your current quota" = daily limit hit — retrying won't help
+      const isDailyQuotaExhausted = msg.includes("exceeded your current quota");
+      if (isDailyQuotaExhausted) {
+        throw new Error(
+          "Gemini API daily quota exhausted. Please wait until midnight (PT) for it to reset, " +
+            "or add billing at https://ai.dev/rate-limit to increase limits.",
+        );
+      }
+      if ((!is503 && !is429) || attempt === maxRetries - 1) throw err;
+      // Respect the retry-delay header hint if present, otherwise exponential backoff
+      const retryMatch = msg.match(/retry in (\d+(?:\.\d+)?)s/i);
+      const baseWait = retryMatch
+        ? Math.ceil(parseFloat(retryMatch[1])) * 1000
+        : 1000 * Math.pow(2, attempt + 1); // 2s, 4s, 8s, 16s
+      await new Promise((r) => setTimeout(r, baseWait));
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
+
 function stripCodeFence(text: string): string {
   const trimmed = text.trim();
   if (!trimmed.startsWith("```")) {
@@ -101,7 +164,7 @@ function parseJson<T>(value: string): T {
   return JSON.parse(stripCodeFence(value)) as T;
 }
 
-async function readStore(): Promise<StoreShape> {
+export async function readStore(): Promise<StoreShape> {
   await ensureDataFiles();
   const raw = await readFile(VECTOR_STORE_PATH, "utf8");
   return JSON.parse(raw) as StoreShape;
@@ -111,16 +174,61 @@ async function writeStore(store: StoreShape): Promise<void> {
   await writeFile(VECTOR_STORE_PATH, JSON.stringify(store, null, 2), "utf8");
 }
 
+function normalizeInvoiceType(value: unknown): InvoiceType | null {
+  return value === "recurring" || value === "one_time" ? value : null;
+}
+
+function normalizeConfidence(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  if (value >= 0 && value <= 1) {
+    return Number(value.toFixed(2));
+  }
+  if (value > 1 && value <= 100) {
+    return Number((value / 100).toFixed(2));
+  }
+  return null;
+}
+
+function normalizeBillRecord(record: BillRecord): BillRecord {
+  const invoiceType =
+    normalizeInvoiceType(record.invoiceType) ??
+    (record.isRecurring === false ? "one_time" : "recurring");
+
+  return {
+    ...record,
+    dueDate: typeof record.dueDate === "string" ? record.dueDate : null,
+    usage: typeof record.usage === "number" ? record.usage : null,
+    isRecurring: invoiceType === "recurring",
+    invoiceType,
+    classificationReason:
+      typeof record.classificationReason === "string"
+        ? record.classificationReason
+        : null,
+    classificationEvidence: Array.isArray(record.classificationEvidence)
+      ? record.classificationEvidence.filter(
+          (item): item is string => typeof item === "string",
+        )
+      : [],
+    classificationConfidence: normalizeConfidence(
+      record.classificationConfidence,
+    ),
+    sourceDocumentId:
+      typeof record.sourceDocumentId === "string" ? record.sourceDocumentId : null,
+  };
+}
+
 export async function readBillRecords(): Promise<BillRecord[]> {
   await ensureDataFiles();
   const raw = await readFile(BILLS_PATH, "utf8");
   const parsed = JSON.parse(raw) as { records: BillRecord[] };
-  return parsed.records;
+  return parsed.records.map((record) => normalizeBillRecord(record));
 }
 
 export async function appendBillRecord(record: BillRecord): Promise<void> {
   const records = await readBillRecords();
-  records.push(record);
+  records.push(normalizeBillRecord(record));
   await writeFile(BILLS_PATH, JSON.stringify({ records }, null, 2), "utf8");
 }
 
@@ -178,8 +286,8 @@ function buildFallbackEmbedding(text: string): number[] {
 export async function embedText(text: string): Promise<number[]> {
   try {
     const client = getGeminiClient();
-    const model = client.getGenerativeModel({ model: "text-embedding-004" });
-    const result = await model.embedContent(text);
+    const model = client.getGenerativeModel({ model: "gemini-embedding-001" });
+    const result = await withRetry(() => model.embedContent(text));
     const values = result.embedding.values;
     if (!values || !Array.isArray(values) || values.length === 0) {
       return buildFallbackEmbedding(text);
@@ -188,6 +296,25 @@ export async function embedText(text: string): Promise<number[]> {
   } catch {
     return buildFallbackEmbedding(text);
   }
+}
+
+async function embedChunksBatched(
+  chunks: string[],
+  batchSize = 5,
+  delayMs = 500,
+): Promise<number[][]> {
+  const results: number[][] = [];
+  for (let i = 0; i < chunks.length; i += batchSize) {
+    const batch = chunks.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map((chunk) => embedText(chunk)),
+    );
+    results.push(...batchResults);
+    if (i + batchSize < chunks.length) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  return results;
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -204,18 +331,18 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / denom;
 }
 
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+
 export async function extractTextFromFileWithLayout(
   file: File,
+  includeClassification = false,
 ): Promise<string> {
   const allowed = [
     "text/plain",
     "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-    "application/msword", // .doc
-    "image/png",
-    "image/jpeg",
-    "image/jpg",
-    "image/webp",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
+    ...IMAGE_TYPES,
   ];
   if (!allowed.includes(file.type)) {
     throw new Error(
@@ -223,31 +350,154 @@ export async function extractTextFromFileWithLayout(
     );
   }
 
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  // TXT — read directly, zero API calls
   if (file.type === "text/plain") {
     return await file.text();
   }
 
-  const client = getGeminiClient();
-  const model = client.getGenerativeModel({
-    model: "gemini-3-flash-preview",
-  });
+  // PDF — extract locally with pdf-parse first
+  if (file.type === "application/pdf") {
+    const parsed = await pdfParse(buffer);
+    const text = parsed.text.trim();
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+    // If enough text was extracted, it's a text-based PDF — use it directly
+    if (text.length >= 150) {
+      return appendClassificationHint(text, includeClassification);
+    }
 
-  const prompt =
-    "Extract all visible text from this document while preserving reading order, table structure, line-item relationships, section headers, and small-footnote clauses. Return plain text only.";
+    // Text too short — PDF is likely image-based, needs AI OCR
+    console.log(
+      "PDF appears to be image-based (text_length < 150), attempting AI OCR...",
+    );
+  }
 
-  const response = await model.generateContent([
-    prompt,
-    {
-      inlineData: {
-        mimeType: file.type,
-        data: buffer.toString("base64"),
-      },
-    },
-  ]);
+  // DOCX / DOC — extract locally with mammoth, zero API calls
+  if (
+    file.type ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    file.type === "application/msword"
+  ) {
+    const result = await mammoth.extractRawText({ buffer });
+    return appendClassificationHint(result.value.trim(), includeClassification);
+  }
 
-  return response.response.text().trim();
+  // Images and image-based PDFs — use AI for OCR
+  const classifyPart = includeClassification
+    ? [
+        "\n\nAfter the extracted text, add a classification block in this exact format:",
+        "---CLASSIFICATION---",
+        '{"doc_type":"bill or contract or other","service_name":"company name or null","category":"Rental or SaaS or Utility or Insurance or Telecom or Other or null"}',
+        "---END---",
+        "doc_type should be 'bill' for invoices/bills/receipts/statements, 'contract' for agreements/terms, 'other' otherwise.",
+      ].join("\n")
+    : "";
+
+  const ocrPrompt =
+    "Extract all visible text from this document while preserving reading order, table structure, line-item relationships, section headers, and small-footnote clauses. Return plain text only." +
+    classifyPart;
+
+  // Try Gemini first for OCR
+  try {
+    const client = getGeminiClient();
+    const model = client.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const mimeType =
+      file.type === "application/pdf" ? "application/pdf" : file.type;
+    const response = await withRetry(() =>
+      model.generateContent([
+        ocrPrompt,
+        { inlineData: { mimeType, data: buffer.toString("base64") } },
+      ]),
+    );
+    return response.response.text().trim();
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    const isQuotaError =
+      msg.includes("quota exhausted") ||
+      msg.includes("exceeded your current quota");
+    if (!isQuotaError) throw error;
+
+    // Gemini quota exhausted — fall back to OpenAI Vision
+    console.log(
+      "⚠️  Gemini quota exhausted for OCR, falling back to OpenAI Vision...",
+    );
+    const openai = getOpenAIClient();
+
+    // For PDFs: use GPT-4o with file input; for images: use vision
+    if (file.type === "application/pdf") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const completion = await (openai.chat.completions.create as any)({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: ocrPrompt },
+              {
+                type: "file",
+                file: {
+                  filename: file.name,
+                  file_data: `data:application/pdf;base64,${buffer.toString("base64")}`,
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 4096,
+      });
+      return (completion.choices[0]?.message?.content ?? "").trim();
+    } else {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: ocrPrompt },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${file.type};base64,${buffer.toString("base64")}`,
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 4096,
+      });
+      return (completion.choices[0]?.message?.content ?? "").trim();
+    }
+  }
+}
+
+function appendClassificationHint(
+  text: string,
+  includeClassification: boolean,
+): string {
+  if (!includeClassification) return text;
+  const lower = text.toLowerCase();
+  const isBill =
+    /invoice|receipt|bill|statement|amount\s*due|total\s*due|grand\s*total/i.test(
+      lower,
+    );
+  const docType = isBill ? "bill" : "contract";
+  // Attempt to guess a service name from common patterns
+  const serviceMatch = text.match(
+    /(?:from|provider|company|service)[\s:]+([A-Z][A-Za-z0-9 &.,'-]{2,40})/,
+  );
+  const serviceName = serviceMatch ? serviceMatch[1].trim() : null;
+  const classificationBlock = [
+    "",
+    "---CLASSIFICATION---",
+    JSON.stringify({
+      doc_type: docType,
+      service_name: serviceName,
+      category: null,
+    }),
+    "---END---",
+  ].join("\n");
+  return text + classificationBlock;
 }
 
 export async function indexDocument(params: {
@@ -276,7 +526,7 @@ export async function indexDocument(params: {
   };
 
   const chunks = splitTextIntoChunks(params.extractedText);
-  const vectors = await Promise.all(chunks.map((chunk) => embedText(chunk)));
+  const vectors = await embedChunksBatched(chunks);
   const vectorChunks: VectorChunk[] = chunks.map((chunk, index) => ({
     id: randomUUID(),
     documentId,
@@ -340,17 +590,142 @@ export async function generateStrictJson<T>(
   prompt: string,
   context: string,
 ): Promise<T> {
-  const client = getGeminiClient();
+  // Demo mode - return mock data for presentations
+  if (process.env.DEMO_MODE === "true") {
+    console.log("DEMO MODE: Returning mock data...");
 
-  const model = client.getGenerativeModel({
-    model: "gemini-3-flash-preview",
-  });
+    // Detect what type of request based on prompt keywords
+    const promptLower = prompt.toLowerCase();
 
-  const response = await model.generateContent(
-    `${prompt}\n\nContext:\n${context}\n\nReturn strict JSON only. Do not include markdown code fences.`,
-  );
+    // Extract request (from /api/extract)
+    if (promptLower.includes("extract") && promptLower.includes("billing")) {
+      return {
+        category: "SaaS",
+        next_due_date: "2026-04-15",
+        amount: 79.99,
+        notice_period: "30 days prior written notice",
+        penalty_rules: [
+          "Late payment fee of $15 after 10 days",
+          "Service suspension after 30 days of non-payment",
+        ],
+        hidden_rules: [
+          "Auto-renewal unless cancelled 30 days before billing cycle",
+          "Price increase clause: up to 10% annually with 30 days notice",
+        ],
+        evidence: [
+          "Payment due on the 15th of each month",
+          "Cancellation requires 30 days written notice",
+          "Automatic renewal applies unless cancelled",
+        ],
+      } as T;
+    }
 
-  return parseJson<T>(response.response.text());
+    // Anomaly detection request (from /api/detect-anomaly)
+    if (promptLower.includes("detect") && promptLower.includes("anomaly")) {
+      return {
+        is_anomaly: true,
+        previous_amount: 75.0,
+        current_amount: 95.0,
+        change_percent: 26.67,
+        cause_type: "rate_change",
+        cause_summary:
+          "Price increase detected. Current bill is 26.67% higher than previous month. Contract clause allows up to 10% annual price adjustment with 30 days notice.",
+        contract_evidence: [
+          "Pricing subject to annual review and adjustment",
+          "Supplier reserves the right to increase rates with 30 days written notice",
+          "Base rate: $75/month, subject to change",
+        ],
+      } as T;
+    }
+
+    // Bill extraction (from /api/ingest for bills)
+    if (promptLower.includes("amount") || promptLower.includes("due_date")) {
+      return {
+        amount: "95.00",
+        due_date: "2026-04-15",
+        bill_date: "2026-03-15",
+        usage: 850,
+        invoice_type: "recurring",
+        invoice_type_reason:
+          "The invoice includes a monthly billing period for an ongoing service.",
+        invoice_type_evidence: [
+          "Monthly service fee",
+          "Billing period: Mar 2026",
+          "Renews on Apr 15, 2026",
+        ],
+        invoice_type_confidence: 0.93,
+      } as T;
+    }
+
+    // Fallback generic response
+    return {} as T;
+  }
+
+  // Normal mode - try Gemini first, fall back to OpenAI if quota exhausted
+  try {
+    const client = getGeminiClient();
+
+    const model = client.getGenerativeModel({
+      model: "gemini-2.0-flash",
+    });
+
+    const response = await withRetry(() =>
+      model.generateContent(
+        `${prompt}\n\nContext:\n${context}\n\nReturn strict JSON only. Do not include markdown code fences.`,
+      ),
+    );
+
+    return parseJson<T>(response.response.text());
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    const isQuotaError =
+      msg.includes("quota exhausted") ||
+      msg.includes("exceeded your current quota");
+
+    // If quota exhausted, fall back to OpenAI/OpenRouter
+    if (isQuotaError) {
+      const apiKey = process.env.OPENAI_API_KEY ?? "";
+      const isOpenRouter = apiKey.startsWith("sk-or-v1");
+      console.log(
+        `⚠️  Gemini quota exhausted, falling back to ${isOpenRouter ? "OpenRouter" : "OpenAI"}...`,
+      );
+
+      const openai = getOpenAIClient();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const body: any = {
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a helpful assistant that extracts structured data. Always return valid JSON only, without markdown code fences.",
+          },
+          {
+            role: "user",
+            content: `${prompt}\n\nContext:\n${context}`,
+          },
+        ],
+        temperature: 0.2,
+      };
+
+      if (isOpenRouter) {
+        body.model = "meta-llama/llama-3.2-3b-instruct:free";
+        body.models = [
+          "meta-llama/llama-3.2-3b-instruct:free",
+          "mistralai/mistral-7b-instruct:free",
+          "microsoft/phi-3-mini-128k-instruct:free",
+        ];
+      } else {
+        body.model = "gpt-3.5-turbo";
+      }
+
+      const completion = await openai.chat.completions.create(body);
+      const text = completion.choices[0]?.message?.content || "{}";
+      return parseJson<T>(text);
+    }
+
+    // If not a quota error, re-throw
+    throw error;
+  }
 }
 
 export function parseLooseMoney(value: string): number | null {

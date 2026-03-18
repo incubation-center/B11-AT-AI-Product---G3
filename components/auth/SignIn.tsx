@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { signInSchema } from "@/lib/zod";
+import { toast } from "sonner";
 
 type SignInErrors = {
   email?: string;
   password?: string;
-  general?: string;
 };
 
 export default function SignIn() {
@@ -60,15 +60,15 @@ export default function SignIn() {
       });
 
       if (error) {
-        setErrors({ general: error.message || "Invalid email or password" });
+        toast.error(error.message || "Invalid email or password");
         return;
       }
 
-      // Success! Redirect to dashboard or home
+      toast.success("Signed in successfully!");
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setErrors({ general: "Something went wrong. Please try again." });
+      toast.error("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +82,7 @@ export default function SignIn() {
         callbackURL: "/dashboard",
       });
     } catch {
-      setErrors({ general: "Google sign-in failed" });
+      toast.error("Google sign-in failed. Please try again.");
       setIsLoading(false);
     }
   };
@@ -97,12 +97,6 @@ export default function SignIn() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
       >
-        {errors.general && (
-          <div className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-            {errors.general}
-          </div>
-        )}
-
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium">

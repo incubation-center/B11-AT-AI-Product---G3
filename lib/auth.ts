@@ -6,6 +6,7 @@ import { schema as authSchema } from "@/db/schema/users";
 import { sendResetEmail, sendVerificationEmail } from "@/lib/email";
 
 export const auth = betterAuth({
+  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
   secret: process.env.BETTER_AUTH_SECRET,
   socialProviders: {
     google: {
