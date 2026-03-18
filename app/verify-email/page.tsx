@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
@@ -8,7 +8,7 @@ import { CheckCircle2, XCircle, Loader2, Mail } from "lucide-react";
 import AuthPageShell from "@/components/AuthPageShell";
 import { Button } from "@/components/ui/button";
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = React.useState<
     "loading" | "success" | "error" | "pending"
@@ -119,5 +119,13 @@ export default function VerifyEmailPage() {
         )}
       </motion.div>
     </AuthPageShell>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

@@ -1,21 +1,24 @@
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { config } from "dotenv";
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
-// Load environment variables
-config({ path: ".env" });
+let _db: NeonHttpDatabase | null = null;
 
-// Validate database URL exists
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error(
-    "DATABASE_URL environment variable is required. Please check your .env file and ensure it contains a valid Neon database connection string."
-  );
+function getDb(): NeonHttpDatabase {
+  if (_db) return _db;
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error(
+      "DATABASE_URL environment variable is required. Please check your .env file and ensure it contains a valid Neon database connection string."
+    );
+  }
+  const sql = neon(databaseUrl);
+  _db = drizzle({ client: sql });
+  return _db;
 }
 
-// Initialize Neon client with connection string
-const sql = neon(databaseUrl);
-
-// Create Drizzle database instance
-export const db = drizzle({ client: sql });
+export const db = new Proxy({} as NeonHttpDatabase, {
+  get(_target, prop) {
+    return Reflect.get(getDb(), prop);
+  },
+});

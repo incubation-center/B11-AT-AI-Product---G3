@@ -198,7 +198,7 @@ import { user } from "./users";
       aiConfidence: decimal("ai_confidence", { precision: 5, scale: 2 }), // 0-100
   
       // Suggested actions
-      suggestedAction: text("suggested_action"), // e.g., 'contact_provider', 'dispute', 'cancel'
+      suggestedAction: text("suggested_action"), 
   
       // Resolution tracking
       isResolved: boolean("is_resolved").default(false),

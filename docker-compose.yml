@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  web:
+    image: duey:latest
+    container_name: duey
+    restart: always
+    build:
+      context: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
