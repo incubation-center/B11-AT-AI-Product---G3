@@ -221,12 +221,19 @@ function UploadModal({
 
   const isLoading =
     status === "uploading" || status === "analyzing" || status === "extracting";
+  const handleDismiss = () => {
+    if (status === "done") {
+      (onDone ?? onClose)();
+      return;
+    }
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleDismiss}
       />
       <div className="relative w-full max-w-lg rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] shadow-2xl">
         {/* Header */}
@@ -238,7 +245,7 @@ function UploadModal({
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleDismiss}
             className="rounded-lg p-1.5 transition hover:bg-[hsl(var(--bg))]"
           >
             <X className="h-4 w-4" />

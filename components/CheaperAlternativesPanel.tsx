@@ -1,0 +1,225 @@
+"use client";
+
+import { useState } from "react";
+import type { CheaperAlternativeOpportunity } from "@/lib/workspace-data";
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function riskClassName(risk: "low" | "medium" | "high"): string {
+  if (risk === "low") return "bg-[hsl(var(--success-soft))] text-[hsl(var(--success))]";
+  if (risk === "medium") return "bg-[hsl(var(--warning-soft))] text-[hsl(var(--warning))]";
+  return "bg-[hsl(var(--danger-soft))] text-[hsl(var(--danger))]";
+}
+
+const DOWN_REASONS = [
+  { value: "not_relevant", label: "Not relevant" },
+  { value: "missing_features", label: "Missing features" },
+  { value: "savings_too_small", label: "Savings too small" },
+  { value: "prefer_current", label: "Prefer current service" },
+  { value: "other", label: "Other" },
+] as const;
+
+type VoteState = {
+  state: "idle" | "saving" | "saved" | "error";
+  vote: "up" | "down" | null;
+  message: string;
+};
+
+export default function CheaperAlternativesPanel({
+  opportunities,
+}: {
+  opportunities: CheaperAlternativeOpportunity[];
+}) {
+  const [voteStateByKey, setVoteStateByKey] = useState<Record<string, VoteState>>({});
+  const [reasonByKey, setReasonByKey] = useState<Record<string, string>>({});
+
+  async function submitFeedback(
+    item: CheaperAlternativeOpportunity,
+    vote: "up" | "down",
+  ) {
+    const key = item.opportunityKey;
+    setVoteStateByKey((prev) => ({
+      ...prev,
+      [key]: { state: "saving", vote, message: "" },
+    }));
+
+    try {
+      const response = await fetch("/api/cheaper-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          opportunity_key: item.opportunityKey,
+          service_name: item.serviceName,
+          alternative_provider: item.alternative.provider,
+          alternative_plan: item.alternative.plan,
+          vote,
+          reason: vote === "down" ? reasonByKey[key] ?? "not_relevant" : null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save feedback");
+      }
+
+      setVoteStateByKey((prev) => ({
+        ...prev,
+        [key]: {
+          state: "saved",
+          vote,
+          message: "Thanks, feedback saved.",
+        },
+      }));
+    } catch {
+      setVoteStateByKey((prev) => ({
+        ...prev,
+        [key]: {
+          state: "error",
+          vote,
+          message: "Could not save feedback. Try again.",
+        },
+      }));
+    }
+  }
+
+  return (
+    <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
+      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">AI Cheaper Alternatives</h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-ink))]">
+            Fast suggestions with pricing, savings, and confidence.
+          </p>
+        </div>
+        <span className="rounded-full bg-[hsl(var(--bg))] px-3 py-1 text-xs font-semibold text-[hsl(var(--muted-ink))]">
+          {opportunities.length} opportunities
+        </span>
+      </div>
+
+      {opportunities.length === 0 ? (
+        <p className="mt-4 text-sm text-[hsl(var(--muted-ink))]">
+          Not enough recurring billing signals yet. Upload more recurring invoices to unlock stronger recommendations.
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {opportunities.map((item) => {
+            const currentVoteState = voteStateByKey[item.opportunityKey] ?? {
+              state: "idle",
+              vote: item.feedbackSummary.userVote,
+              message: "",
+            };
+
+            return (
+              <article
+                key={item.opportunityKey}
+                className="rounded-xl border border-[hsl(var(--line))] bg-[linear-gradient(145deg,hsl(var(--bg)),hsl(var(--surface)))] p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-medium">
+                    Switch <span className="font-semibold">{item.serviceName}</span> to{" "}
+                    <span className="font-semibold">
+                      {item.alternative.provider} ({item.alternative.plan})
+                    </span>{" "}
+                    and save {formatCurrency(item.estimatedMonthlySavings)}/mo.
+                  </p>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${riskClassName(item.alternative.risk)}`}>
+                    {item.alternative.risk} risk
+                  </span>
+                </div>
+
+                <p className="mt-2 text-sm text-[hsl(var(--muted-ink))]">{item.alternative.reason}</p>
+
+                <div className="mt-3 grid gap-2 rounded-lg bg-[hsl(var(--surface))] p-3 sm:grid-cols-2">
+                  <p className="text-xs text-[hsl(var(--muted-ink))]">
+                    Current est. monthly
+                    <span className="mt-0.5 block text-sm font-semibold text-[hsl(var(--ink))]">
+                      {formatCurrency(item.currentEstimatedMonthly)}
+                    </span>
+                  </p>
+                  <p className="text-xs text-[hsl(var(--muted-ink))]">
+                    Alternative monthly
+                    <span className="mt-0.5 block text-sm font-semibold text-[hsl(var(--ink))]">
+                      {formatCurrency(item.alternative.monthlyPrice)}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-[hsl(var(--success-soft))] px-2.5 py-1 text-xs font-semibold text-[hsl(var(--success))]">
+                    {formatCurrency(item.estimatedYearlySavings)}/yr
+                  </span>
+                  <span className="rounded-full bg-[hsl(var(--bg))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--muted-ink))]">
+                    {Math.round(item.confidence * 100)}% confidence
+                  </span>
+                  <span className="rounded-full bg-[hsl(var(--bg))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--muted-ink))]">
+                    {item.feedbackSummary.upvotes} helpful
+                  </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-3 py-1.5 text-xs font-medium hover:bg-[hsl(var(--bg))] disabled:opacity-60"
+                    onClick={() => submitFeedback(item, "up")}
+                    disabled={currentVoteState.state === "saving"}
+                  >
+                    Helpful
+                  </button>
+
+                  <select
+                    className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-2.5 py-1.5 text-xs"
+                    value={reasonByKey[item.opportunityKey] ?? item.feedbackSummary.userReason ?? "not_relevant"}
+                    onChange={(event) =>
+                      setReasonByKey((prev) => ({
+                        ...prev,
+                        [item.opportunityKey]: event.target.value,
+                      }))
+                    }
+                  >
+                    {DOWN_REASONS.map((entry) => (
+                      <option key={entry.value} value={entry.value}>
+                        {entry.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-3 py-1.5 text-xs font-medium hover:bg-[hsl(var(--bg))] disabled:opacity-60"
+                    onClick={() => submitFeedback(item, "down")}
+                    disabled={currentVoteState.state === "saving"}
+                  >
+                    Not useful
+                  </button>
+                </div>
+
+                {currentVoteState.message ? (
+                  <p className="mt-2 text-xs text-[hsl(var(--muted-ink))]">{currentVoteState.message}</p>
+                ) : null}
+
+                <details className="mt-3 rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-3">
+                  <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-ink))]">
+                    Why this score
+                  </summary>
+                  <ul className="mt-2 space-y-1 text-xs">
+                    <li>Price advantage score: {Math.round(item.confidenceBreakdown.priceAdvantage * 100)}%</li>
+                    <li>Data coverage score: {Math.round(item.confidenceBreakdown.dataCoverage * 100)}%</li>
+                    <li>Category match score: {Math.round(item.confidenceBreakdown.categoryMatch * 100)}%</li>
+                    <li>Price freshness score: {Math.round(item.confidenceBreakdown.priceFreshness * 100)}%</li>
+                    <li>
+                      Baseline price: {formatCurrency(item.alternative.billedAmount)} per{" "}
+                      {item.alternative.billingCycle} (updated {item.alternative.priceUpdatedAt})
+                    </li>
+                  </ul>
+                </details>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}

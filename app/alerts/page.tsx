@@ -1,6 +1,20 @@
 import WorkspaceShell from "@/components/WorkspaceShell";
 import { getWorkspaceData } from "@/lib/workspace-data";
 
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function getReminderLabel(daysUntilDue: number): string {
+  if (daysUntilDue < 0) return `Overdue by ${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) === 1 ? "" : "s"}`;
+  if (daysUntilDue === 0) return "Due today";
+  return `Due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"}`;
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function AlertsPage() {
@@ -32,6 +46,34 @@ export default async function AlertsPage() {
           <AlertCard label="Due/Overdue" value={data.dueAlerts.length} />
           <AlertCard label="Anomalies" value={data.anomalyCount} />
           <AlertCard label="Low Confidence" value={data.lowConfidenceCount} />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
+        <h2 className="text-xl font-semibold">Due Reminders</h2>
+        <p className="mt-1 text-sm text-[hsl(var(--muted-ink))]">
+          In-system reminders for recurring invoices within your reminder window.
+        </p>
+        <div className="mt-4 space-y-2">
+          {data.dueReminders.length === 0 && (
+            <p className="text-sm text-[hsl(var(--muted-ink))]">
+              No due reminders right now.
+            </p>
+          )}
+          {data.dueReminders.map((item) => (
+            <div
+              key={item.billId}
+              className="flex items-center justify-between rounded-xl bg-[hsl(var(--bg))] px-4 py-3"
+            >
+              <div>
+                <p className="font-medium">{item.serviceName}</p>
+                <p className="text-xs text-[hsl(var(--muted-ink))]">
+                  Due {item.dueDate} • {getReminderLabel(item.daysUntilDue)}
+                </p>
+              </div>
+              <p className="font-semibold">{formatCurrency(item.amount)}</p>
+            </div>
+          ))}
         </div>
       </section>
 

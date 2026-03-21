@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db/drizzle";
+import { billsTable, contractsTable } from "@/db/schema/tableSchema";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const VECTOR_STORE_PATH = path.join(DATA_DIR, "vector-store.json");
@@ -48,6 +51,32 @@ export async function DELETE(
     }
     if (userId && doc.userId !== userId) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+
+    if (process.env.DATABASE_URL) {
+      const dbDoc = await db
+        .select({ id: contractsTable.id, userId: contractsTable.userId })
+        .from(contractsTable)
+        .where(eq(contractsTable.id, id))
+        .limit(1);
+
+      if (dbDoc.length > 0) {
+        if (userId && dbDoc[0].userId !== userId) {
+          return NextResponse.json({ error: "forbidden" }, { status: 403 });
+        }
+
+        await db
+          .delete(billsTable)
+          .where(eq(billsTable.sourceDocumentId, id));
+
+        await db
+          .delete(contractsTable)
+          .where(
+            userId
+              ? and(eq(contractsTable.id, id), eq(contractsTable.userId, userId))
+              : eq(contractsTable.id, id),
+          );
+      }
     }
 
     // Remove document, its chunks, and any linked bill records
