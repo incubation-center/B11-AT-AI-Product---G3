@@ -13,6 +13,9 @@ export const dynamic = "force-dynamic";
 
 export default async function CalendarPage() {
   const data = await getWorkspaceData();
+  const reminderByBillId = new Map(
+    data.dueReminders.map((item) => [item.billId, item]),
+  );
 
   return (
     <WorkspaceShell
@@ -46,6 +49,12 @@ export default async function CalendarPage() {
                 <p className="text-xs text-[hsl(var(--muted-ink))]">
                   Due {bill.dueDate}
                 </p>
+                {reminderByBillId.has(bill.id) && (
+                  <p className="text-xs text-[hsl(var(--warning))]">
+                    Reminder active ({reminderByBillId.get(bill.id)!.daysUntilDue} day
+                    {reminderByBillId.get(bill.id)!.daysUntilDue === 1 ? "" : "s"} left)
+                  </p>
+                )}
               </div>
               <p className="font-semibold">{formatCurrency(bill.amount)}</p>
             </div>

@@ -68,43 +68,42 @@ export default function DashboardSidebar({
   const pathname = usePathname();
 
   return (
-    <>
-      <nav className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-3 shadow-sm lg:sticky lg:top-6 lg:h-fit">
-        <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-ink))]">
-          Navigation
-        </p>
-        <ul className="space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const count = item.countKey ? counts[item.countKey] : null;
-            const isActive = pathname === item.href;
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    "flex items-center justify-between rounded-xl px-3 py-2 text-sm transition",
-                    "hover:bg-[hsl(var(--bg))]",
-                    isActive
-                      ? "bg-[hsl(var(--bg))] text-[hsl(var(--primary))]"
-                      : "text-[hsl(var(--ink))] hover:text-[hsl(var(--primary))]",
-                  )}
-                >
-                  <span className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
+    <nav className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface)/0.9)] p-3 shadow-sm lg:h-full lg:rounded-none lg:border-0 lg:bg-transparent lg:p-5 lg:shadow-none">
+      <div className="px-3 pb-3 pt-2">
+        <p className="text-lg font-bold tracking-tight text-[hsl(var(--ink))]">Duey</p>
+        
+      </div>
+      <ul className="space-y-1">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const count = item.countKey ? counts[item.countKey] : null;
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className={cn(
+                  "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition",
+                  "hover:bg-[hsl(var(--bg)/0.9)]",
+                  isActive
+                    ? "bg-[linear-gradient(90deg,hsl(var(--primary)/0.18),hsl(var(--accent)/0.16))] text-[hsl(var(--ink))] ring-1 ring-[hsl(var(--primary)/0.28)]"
+                    : "text-[hsl(var(--ink))] hover:text-[hsl(var(--primary))]",
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  <Icon className={cn("h-4 w-4", isActive && "text-[hsl(var(--primary))]")} />
+                  <span>{item.label}</span>
+                </span>
+                {typeof count === "number" && (
+                  <span className="rounded-full bg-[hsl(var(--bg))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-ink))]">
+                    {count}
                   </span>
-                  {typeof count === "number" && (
-                    <span className="rounded-full bg-[hsl(var(--bg))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-ink))]">
-                      {count}
-                    </span>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-    </>
+                )}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }

@@ -3,6 +3,9 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
+import { eq } from "drizzle-orm";
+import { db } from "@/db/drizzle";
+import { billsTable, contractsTable } from "@/db/schema/tableSchema";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require("pdf-parse/lib/pdf-parse") as (
   buffer: Buffer,
@@ -71,6 +74,107 @@ const BILLS_PATH = path.join(DATA_DIR, "bills.json");
 const EXECUTION_LOG_PATH = path.join(DATA_DIR, "execution-log.json");
 
 const EMBEDDING_DIM = 256;
+
+function normalizeDocTypeForDb(value: DocType): "contract" | "bill" | "receipt" {
+  if (value === "contract" || value === "bill") return value;
+  return "receipt";
+}
+
+function normalizeCategoryForDb(
+  value: string | null,
+): "rental" | "saas" | "utility" | "insurance" | "internet" | "other" | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "rental" ||
+    normalized === "saas" ||
+    normalized === "utility" ||
+    normalized === "insurance" ||
+    normalized === "internet" ||
+    normalized === "other"
+  ) {
+    return normalized;
+  }
+  return null;
+}
+
+async function persistDocumentToDb(params: {
+  id: string;
+  userId: string;
+  serviceName: string | null;
+  categoryHint: string | null;
+  docType: DocType;
+  originalFilename: string;
+  mimeType: string;
+  textLength: number;
+  extractedText: string;
+  chunkCount: number;
+  createdAtIso: string;
+}) {
+  if (!process.env.DATABASE_URL) return;
+
+  const existing = await db
+    .select({ id: contractsTable.id })
+    .from(contractsTable)
+    .where(eq(contractsTable.id, params.id))
+    .limit(1);
+
+  if (existing.length > 0) return;
+
+  await db.insert(contractsTable).values({
+    id: params.id,
+    userId: params.userId,
+    serviceName: params.serviceName ?? params.originalFilename,
+    category: normalizeCategoryForDb(params.categoryHint),
+    docType: normalizeDocTypeForDb(params.docType),
+    originalFilename: params.originalFilename,
+    mimeType: params.mimeType || null,
+    fileKey: `local:data/vector-store.json#${params.id}`,
+    textLength: params.textLength,
+    rawText: params.extractedText,
+    pineconeNamespace: null,
+    chunksIndexed: params.chunkCount,
+    createdAt: new Date(params.createdAtIso),
+    updatedAt: new Date(params.createdAtIso),
+  });
+}
+
+async function persistBillToDb(record: BillRecord) {
+  if (!process.env.DATABASE_URL) return;
+
+  const normalized = normalizeBillRecord(record);
+  const existing = await db
+    .select({ id: billsTable.id })
+    .from(billsTable)
+    .where(eq(billsTable.id, normalized.id))
+    .limit(1);
+
+  if (existing.length > 0) return;
+
+  await db.insert(billsTable).values({
+    id: normalized.id,
+    contractId: normalized.sourceDocumentId,
+    userId: normalized.userId,
+    serviceName: normalized.serviceName,
+    amount: normalized.amount.toFixed(2),
+    currency: "USD",
+    billDate: new Date(normalized.billDate),
+    dueDate: normalized.dueDate ? new Date(normalized.dueDate) : null,
+    usage: typeof normalized.usage === "number" ? normalized.usage.toFixed(2) : null,
+    usageUnit: null,
+    sourceDocumentId: normalized.sourceDocumentId,
+    metadata: {
+      invoiceType: normalized.invoiceType,
+      isRecurring: normalized.isRecurring,
+      classificationReason: normalized.classificationReason,
+      classificationEvidence: normalized.classificationEvidence,
+      classificationConfidence: normalized.classificationConfidence,
+    },
+    isPaid: false,
+    paidAt: null,
+    createdAt: new Date(normalized.createdAt),
+  });
+}
 
 function getGeminiClient(): GoogleGenerativeAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -227,9 +331,16 @@ export async function readBillRecords(): Promise<BillRecord[]> {
 }
 
 export async function appendBillRecord(record: BillRecord): Promise<void> {
+  const normalized = normalizeBillRecord(record);
   const records = await readBillRecords();
-  records.push(normalizeBillRecord(record));
+  records.push(normalized);
   await writeFile(BILLS_PATH, JSON.stringify({ records }, null, 2), "utf8");
+
+  try {
+    await persistBillToDb(normalized);
+  } catch (error) {
+    console.error("Failed to persist bill record to DB:", error);
+  }
 }
 
 export async function appendExecutionLog(payload: Record<string, unknown>) {
@@ -543,6 +654,24 @@ export async function indexDocument(params: {
   store.documents.push(document);
   store.chunks.push(...vectorChunks);
   await writeStore(store);
+
+  try {
+    await persistDocumentToDb({
+      id: document.id,
+      userId: params.userId,
+      serviceName: params.serviceName,
+      categoryHint: params.categoryHint,
+      docType: params.docType,
+      originalFilename: params.originalFilename,
+      mimeType: params.mimeType,
+      textLength: document.textLength,
+      extractedText: params.extractedText,
+      chunkCount: vectorChunks.length,
+      createdAtIso: now,
+    });
+  } catch (error) {
+    console.error("Failed to persist document to DB:", error);
+  }
 
   return { document, chunkCount: vectorChunks.length };
 }

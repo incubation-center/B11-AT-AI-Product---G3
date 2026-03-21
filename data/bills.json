@@ -227,6 +227,121 @@
       "classificationConfidence": 0.8,
       "sourceDocumentId": "4bb4d4d2-b488-4610-b191-aea81e337359",
       "createdAt": "2026-03-18T06:36:59.928Z"
+    },
+    {
+      "id": "fed591a0-3cfc-4015-8605-44ce1a88e7fa",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "FlowSync",
+      "billDate": "2026-03-19",
+      "dueDate": "2026-04-05",
+      "amount": 420.98,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "classificationReason": "The document shows evidence of ongoing subscription fees for services.",
+      "classificationEvidence": [
+        "Subscription Management Platform",
+        "Period Mar 19 – Apr 18, 2026"
+      ],
+      "classificationConfidence": 0.95,
+      "sourceDocumentId": "b8c02869-2cf5-4af6-87b1-6dbb027570dd",
+      "createdAt": "2026-03-19T14:24:34.963Z"
+    },
+    {
+      "id": "42a8dda5-4a48-4f56-914c-3a01684cb08b",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "FlowSync",
+      "billDate": "2026-03-19",
+      "dueDate": "2026-03-27",
+      "amount": 420.98,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "classificationReason": "The invoice contains evidence of ongoing subscription services with a defined service period.",
+      "classificationEvidence": [
+        "Subscription Management Platform",
+        "Period Mar 19 – Apr 18, 2026",
+        "Pro Plan – Seat License"
+      ],
+      "classificationConfidence": 0.95,
+      "sourceDocumentId": "afea06f6-75a2-4f84-9843-546acfb91135",
+      "createdAt": "2026-03-19T14:30:13.991Z"
+    },
+    {
+      "id": "bc433902-1df5-4f93-a5c9-e9229e206afe",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "null",
+      "billDate": "2026-03-21",
+      "dueDate": null,
+      "amount": 117,
+      "usage": null,
+      "isRecurring": false,
+      "invoiceType": "one_time",
+      "classificationReason": "No evidence of ongoing billing cycle",
+      "classificationEvidence": [
+        "Receipt for various items purchased"
+      ],
+      "classificationConfidence": 1,
+      "sourceDocumentId": "ee2b617f-261b-40e4-9379-a9dc7d0ae2ad",
+      "createdAt": "2026-03-21T04:03:08.149Z"
+    },
+    {
+      "id": "e989f348-5d58-463a-983b-8cbc1cee107f",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "Netflix",
+      "billDate": "2024-04-03",
+      "dueDate": null,
+      "amount": 149,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "classificationReason": "The document contains evidence of an ongoing billing cycle with service period mentioned.",
+      "classificationEvidence": [
+        "Service Period 04/03/24—03/04/24",
+        "Subscription service - Streaming Service",
+        "Monthly billing amount"
+      ],
+      "classificationConfidence": 1,
+      "sourceDocumentId": "bfc2a6d6-c849-4c03-af12-7c9dfb89da31",
+      "createdAt": "2026-03-21T04:10:47.912Z"
+    },
+    {
+      "id": "af629efa-dca5-4f1a-88da-6d0dd2d86567",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "Netflix",
+      "billDate": "2026-02-28",
+      "dueDate": "2026-04-01",
+      "amount": 22.99,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "classificationReason": "The document shows evidence of a monthly subscription fee.",
+      "classificationEvidence": [
+        "Monthly Subscription Fee",
+        "Billing period: Mar 2026"
+      ],
+      "classificationConfidence": 0.9,
+      "sourceDocumentId": "72ee338c-5990-4a36-8059-240c070d4da3",
+      "createdAt": "2026-03-21T05:28:41.718Z"
+    },
+    {
+      "id": "e1b9e638-a7eb-428b-ac61-b2ee6ff4584f",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "Netflix",
+      "billDate": "2026-02-28",
+      "dueDate": "2026-04-01",
+      "amount": 22.99,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "classificationReason": "The document shows evidence of a monthly subscription fee.",
+      "classificationEvidence": [
+        "Monthly Subscription Fee",
+        "Billing period: Mar 2026"
+      ],
+      "classificationConfidence": 0.9,
+      "sourceDocumentId": "96c7f5a9-1529-4eef-9917-cd3c5a312499",
+      "createdAt": "2026-03-21T05:30:57.069Z"
     }
   ]
 }
