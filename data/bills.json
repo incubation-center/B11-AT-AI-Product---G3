@@ -342,6 +342,42 @@
       "classificationConfidence": 0.9,
       "sourceDocumentId": "96c7f5a9-1529-4eef-9917-cd3c5a312499",
       "createdAt": "2026-03-21T05:30:57.069Z"
+    },
+    {
+      "id": "e8020d43-c60e-44de-9552-9323c760ce14",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "Netflix",
+      "billDate": "2026-03-23",
+      "dueDate": "2026-04-01",
+      "amount": 22.99,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "classificationReason": "Manually added via /api/add",
+      "classificationEvidence": [
+        "manual_entry"
+      ],
+      "classificationConfidence": 1,
+      "sourceDocumentId": null,
+      "createdAt": "2026-03-23T14:39:26.803Z"
+    },
+    {
+      "id": "d15fc717-2fed-4316-b4a4-3fd43d5917ef",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "Amazon Prime",
+      "billDate": "2026-03-23",
+      "dueDate": "2026-04-01",
+      "amount": 100,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "classificationReason": "Manually added via /api/add",
+      "classificationEvidence": [
+        "manual_entry"
+      ],
+      "classificationConfidence": 1,
+      "sourceDocumentId": null,
+      "createdAt": "2026-03-23T14:41:40.752Z"
     }
   ]
 }
