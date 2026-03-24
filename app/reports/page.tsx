@@ -67,15 +67,7 @@ export default async function ReportsPage() {
         <article className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
           <p className="text-sm text-[hsl(var(--muted-ink))]">Invoice Mix</p>
           <div className="mt-4 flex items-center gap-5">
-            <div
-              className="relative h-36 w-36 rounded-full"
-              style={{
-                background: `conic-gradient(
-                  hsl(var(--primary)) 0 ${recurringShare}%,
-                  hsl(var(--accent)) ${recurringShare}% 100%
-                )`,
-              }}
-            >
+            <div className="relative h-36 w-36 rounded-full border-8 border-[hsl(var(--primary))] bg-[hsl(var(--surface))]">
               <div className="absolute inset-4 flex items-center justify-center rounded-full bg-[hsl(var(--surface))] text-sm font-semibold">
                 {totalBills}
               </div>
@@ -134,7 +126,7 @@ export default async function ReportsPage() {
               </div>
               <div className="h-2.5 overflow-hidden rounded-full bg-[hsl(var(--muted-soft))]">
                 <div
-                  className="h-full rounded-full bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--accent)))]"
+                  className="h-full rounded-full bg-[hsl(var(--primary))]"
                   style={{
                     width:
                       maxServiceTotal > 0

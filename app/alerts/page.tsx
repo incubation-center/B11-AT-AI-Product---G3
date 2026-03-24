@@ -50,10 +50,12 @@ export default async function AlertsPage() {
       </section>
 
       <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
-        <h2 className="text-xl font-semibold">Due Reminders</h2>
-        <p className="mt-1 text-sm text-[hsl(var(--muted-ink))]">
-          In-system reminders for recurring invoices within your reminder window.
-        </p>
+        <div className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3">
+          <h2 className="text-xl font-semibold text-white">Due Reminders</h2>
+          <p className="mt-1 text-sm text-white/85">
+            In-system reminders for recurring invoices within your reminder window.
+          </p>
+        </div>
         <div className="mt-4 space-y-2">
           {data.dueReminders.length === 0 && (
             <p className="text-sm text-[hsl(var(--muted-ink))]">
@@ -78,10 +80,12 @@ export default async function AlertsPage() {
       </section>
 
       <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
-        <h2 className="text-xl font-semibold">Needs Review</h2>
-        <p className="mt-1 text-sm text-[hsl(var(--muted-ink))]">
-          AI classifications under 70% confidence.
-        </p>
+        <div className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3">
+          <h2 className="text-xl font-semibold text-white">Needs Review</h2>
+          <p className="mt-1 text-sm text-white/85">
+            AI classifications under 70% confidence.
+          </p>
+        </div>
         <div className="mt-4 space-y-2">
           {lowConfidenceBills.length === 0 && (
             <p className="text-sm text-[hsl(var(--muted-ink))]">

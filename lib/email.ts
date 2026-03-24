@@ -6,6 +6,13 @@ type VerificationPayload = {
   token?: string;
 };
 
+type DueReminderItem = {
+  serviceName: string;
+  dueDate: string;
+  amount: number;
+  daysUntilDue: number;
+};
+
 function createTransporterAndFrom() {
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT
@@ -264,4 +271,110 @@ export async function sendResetEmail(payload: ResetPayload) {
   } catch (err) {
     console.error(err);
   }
+}
+
+export async function sendDueReminderEmail(payload: {
+  user: { email: string; name?: string };
+  reminders: DueReminderItem[];
+}) {
+  const { user, reminders } = payload;
+  if (reminders.length === 0) return;
+
+  const { transporter, from } = createTransporterAndFrom();
+
+  const sorted = [...reminders].sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+  const first = sorted[0];
+  const subjectPrefix =
+    first.daysUntilDue < 0
+      ? "Overdue payment reminder"
+      : first.daysUntilDue === 0
+        ? "Payment due today"
+        : "Upcoming payment reminder";
+
+  const subject = `${subjectPrefix} - Duey`;
+
+  const textRows = sorted.map((item) => {
+    const when =
+      item.daysUntilDue < 0
+        ? `overdue by ${Math.abs(item.daysUntilDue)} day${Math.abs(item.daysUntilDue) === 1 ? "" : "s"}`
+        : item.daysUntilDue === 0
+          ? "due today"
+          : `due in ${item.daysUntilDue} day${item.daysUntilDue === 1 ? "" : "s"}`;
+    return `- ${item.serviceName}: $${item.amount.toFixed(2)} (Due ${item.dueDate}, ${when})`;
+  });
+
+  const text = `Hi ${user.name ?? ""},\n\nYou have ${sorted.length} billing reminder${sorted.length === 1 ? "" : "s"}:\n${textRows.join("\n")}\n\nReview your dashboard to stay ahead of due dates.\n\nBest regards,\nThe Duey Team`;
+
+  const htmlRows = sorted
+    .map((item) => {
+      const when =
+        item.daysUntilDue < 0
+          ? `Overdue by ${Math.abs(item.daysUntilDue)} day${Math.abs(item.daysUntilDue) === 1 ? "" : "s"}`
+          : item.daysUntilDue === 0
+            ? "Due today"
+            : `Due in ${item.daysUntilDue} day${item.daysUntilDue === 1 ? "" : "s"}`;
+      return `
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb;">${item.serviceName}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb;">$${item.amount.toFixed(2)}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb;">${item.dueDate}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb;">${when}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Billing reminder</title>
+    </head>
+    <body style="margin:0;padding:0;background:#f8f9fa;font-family:Arial,sans-serif;color:#111827;">
+      <table role="presentation" style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="padding:28px 16px;">
+            <table role="presentation" style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+              <tr>
+                <td style="padding:20px 24px;background:#111827;color:#ffffff;">
+                  <h1 style="margin:0;font-size:20px;">Duey reminder</h1>
+                  <p style="margin:8px 0 0;font-size:13px;opacity:0.9;">Upcoming subscription and bill due dates</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:20px 24px;">
+                  <p style="margin:0 0 14px;">Hi${user.name ? ` ${user.name}` : ""}, here are your current billing reminders:</p>
+                  <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px;">
+                    <thead>
+                      <tr>
+                        <th align="left" style="padding:8px 12px;background:#f3f4f6;">Service</th>
+                        <th align="left" style="padding:8px 12px;background:#f3f4f6;">Amount</th>
+                        <th align="left" style="padding:8px 12px;background:#f3f4f6;">Due Date</th>
+                        <th align="left" style="padding:8px 12px;background:#f3f4f6;">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${htmlRows}
+                    </tbody>
+                  </table>
+                  <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Review your Duey dashboard to manage due dates and recurring spend.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  await transporter.sendMail({
+    from,
+    to: user.email,
+    subject,
+    text,
+    html,
+  });
 }

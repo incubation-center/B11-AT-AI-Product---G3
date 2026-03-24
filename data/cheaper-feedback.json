@@ -1,3 +1,112 @@
 {
-  "records": []
+  "records": [
+    {
+      "id": "e0b636f1-b00b-4808-8e4f-dc4ecfe249d4",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "netflix::disney+::standard with ads",
+      "serviceName": "Netflix",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "down",
+      "reason": "savings_too_small",
+      "note": null,
+      "createdAt": "2026-03-24T16:48:40.842Z"
+    },
+    {
+      "id": "e9a17e3a-8af4-437c-be99-77d826cd36d4",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "netflix::disney+::standard with ads",
+      "serviceName": "Netflix",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "down",
+      "reason": "savings_too_small",
+      "note": null,
+      "createdAt": "2026-03-24T16:48:42.380Z"
+    },
+    {
+      "id": "96d1c44a-61c5-45b6-af70-db70f7a37d84",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "netflix::disney+::standard with ads",
+      "serviceName": "Netflix",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "down",
+      "reason": "savings_too_small",
+      "note": null,
+      "createdAt": "2026-03-24T16:48:43.113Z"
+    },
+    {
+      "id": "6a915fb5-b44a-42b1-9378-ee1e25aa0ccd",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "netflix::disney+::standard with ads",
+      "serviceName": "Netflix",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "up",
+      "reason": null,
+      "note": null,
+      "createdAt": "2026-03-24T16:52:38.100Z"
+    },
+    {
+      "id": "85b69516-e82a-4e0d-87ab-abc9ccd5f613",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "netflix::disney+::standard with ads",
+      "serviceName": "Netflix",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "down",
+      "reason": "savings_too_small",
+      "note": null,
+      "createdAt": "2026-03-24T16:52:39.175Z"
+    },
+    {
+      "id": "23f5aa4f-db60-4f98-bb6a-41d7fe98a799",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "netflix::disney+::standard with ads",
+      "serviceName": "Netflix",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "up",
+      "reason": null,
+      "note": null,
+      "createdAt": "2026-03-24T16:52:40.152Z"
+    },
+    {
+      "id": "e59ecafc-b9ac-4ce5-9c77-e2570320ebe1",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "netflix::disney+::standard with ads",
+      "serviceName": "Netflix",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "down",
+      "reason": "savings_too_small",
+      "note": null,
+      "createdAt": "2026-03-24T16:52:42.112Z"
+    },
+    {
+      "id": "813089fb-704a-4d07-9d5b-c71e168b74c5",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "netflix::disney+::standard with ads",
+      "serviceName": "Netflix",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "up",
+      "reason": null,
+      "note": null,
+      "createdAt": "2026-03-24T16:52:43.760Z"
+    },
+    {
+      "id": "00653307-f41a-4b62-8c2a-38e62b17b35b",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "netflix::disney+::standard with ads",
+      "serviceName": "Netflix",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "down",
+      "reason": "savings_too_small",
+      "note": null,
+      "createdAt": "2026-03-24T16:52:44.546Z"
+    }
+  ]
 }

@@ -81,14 +81,14 @@ export default function DashboardDocumentsPanel({
 
   return (
     <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Uploaded Documents</h2>
-          <p className="mt-1 text-sm text-[hsl(var(--muted-ink))]">
+          <h2 className="text-xl font-semibold text-white">Uploaded Documents</h2>
+          <p className="mt-1 text-sm text-white/85">
             Search, filter, and order by due date.
           </p>
         </div>
-        <span className="rounded-full bg-[hsl(var(--bg))] px-3 py-1 text-xs font-medium text-[hsl(var(--muted-ink))]">
+        <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-medium text-[hsl(var(--primary))]">
           {filtered.length} result{filtered.length === 1 ? "" : "s"}
         </span>
       </div>

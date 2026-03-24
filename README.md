@@ -12,6 +12,8 @@ It combines user authentication, dashboard management, and AI-powered API workfl
   - `POST /api/extract`
   - `POST /api/detect-anomaly`
   - `POST /api/execute`
+  - `POST /api/reminders/send-due` (secured cron endpoint for due reminder emails)
+  - `GET/PUT /api/notification-preferences` (per-user due reminder email toggle)
 - Drizzle ORM + PostgreSQL setup for data access and persistence
 
 ## Tech Stack
