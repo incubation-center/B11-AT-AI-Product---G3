@@ -73,15 +73,7 @@ export default async function DashboardPage() {
         <article className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
           <h3 className="text-sm text-[hsl(var(--muted-ink))]">Invoice Mix</h3>
           <div className="mt-4 flex items-center gap-4">
-            <div
-              className="relative h-28 w-28 rounded-full"
-              style={{
-                background: `conic-gradient(
-                  hsl(var(--primary)) 0 ${recurringRatio}%,
-                  hsl(var(--accent)) ${recurringRatio}% 100%
-                )`,
-              }}
-            >
+            <div className="relative h-28 w-28 rounded-full border-8 border-[hsl(var(--primary))] bg-[hsl(var(--surface))]">
               <div className="absolute inset-3 flex items-center justify-center rounded-full bg-[hsl(var(--surface))] text-xs font-semibold">
                 {recurringRatio}%
               </div>
@@ -111,7 +103,7 @@ export default async function DashboardPage() {
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-[hsl(var(--muted-soft))]">
                   <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--accent)))]"
+                    className="h-full rounded-full bg-[hsl(var(--primary))]"
                     style={{
                       width:
                         maxTopServiceSpend > 0

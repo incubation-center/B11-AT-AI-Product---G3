@@ -69,9 +69,8 @@ export default function DashboardSidebar({
 
   return (
     <nav className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface)/0.9)] p-3 shadow-sm lg:h-full lg:rounded-none lg:border-0 lg:bg-transparent lg:p-5 lg:shadow-none">
-      <div className="px-3 pb-3 pt-2">
-        <p className="text-lg font-bold tracking-tight text-[hsl(var(--ink))]">Duey</p>
-        
+      <div className="-mx-3 -mt-3 mb-3 bg-[hsl(var(--primary))] px-3 py-4  lg:-mx-5 lg:-mt-5 lg:mb-4 lg:px-5 lg:py-5">
+        <p className="text-3xl font-bold tracking-tight text-white lg:text-2xl">Duey</p>
       </div>
       <ul className="space-y-1">
         {navItems.map((item) => {
@@ -86,7 +85,7 @@ export default function DashboardSidebar({
                   "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition",
                   "hover:bg-[hsl(var(--bg)/0.9)]",
                   isActive
-                    ? "bg-[linear-gradient(90deg,hsl(var(--primary)/0.18),hsl(var(--accent)/0.16))] text-[hsl(var(--ink))] ring-1 ring-[hsl(var(--primary)/0.28)]"
+                    ? "bg-[hsl(var(--accent-soft))] text-[hsl(var(--ink))] ring-1 ring-[hsl(var(--primary)/0.28)]"
                     : "text-[hsl(var(--ink))] hover:text-[hsl(var(--primary))]",
                 )}
               >

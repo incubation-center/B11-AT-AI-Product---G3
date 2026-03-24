@@ -77,3 +77,26 @@ export async function setReminderDaysForUser(
   await writeStore(store);
   return safeDays;
 }
+
+export async function getReminderDaysByUsers(
+  userIds: string[],
+): Promise<Map<string, number>> {
+  const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)));
+  const out = new Map<string, number>();
+  if (uniqueUserIds.length === 0) return out;
+
+  const store = await readStore();
+  const byUserId = new Map(
+    store.records.map((record) => [record.userId, record.daysBeforeDue]),
+  );
+
+  for (const userId of uniqueUserIds) {
+    const raw = byUserId.get(userId);
+    const normalized = Number.isFinite(raw as number)
+      ? Math.min(30, Math.max(1, Math.round(raw as number)))
+      : DEFAULT_DAYS_BEFORE_DUE;
+    out.set(userId, normalized);
+  }
+
+  return out;
+}

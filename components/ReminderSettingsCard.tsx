@@ -57,7 +57,11 @@ export default function ReminderSettingsCard({
       {error && (
         <p className="mt-2 text-xs text-destructive">{error}</p>
       )}
-      <Button className="mt-3" onClick={save} disabled={isPending}>
+      <Button
+        className="mt-3 bg-[hsl(var(--ink))] text-[hsl(var(--surface))] hover:opacity-90"
+        onClick={save}
+        disabled={isPending}
+      >
         {isPending ? "Saving..." : "Save Reminder"}
       </Button>
     </div>

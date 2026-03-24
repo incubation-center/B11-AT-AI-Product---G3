@@ -1,11 +1,16 @@
 import WorkspaceShell from "@/components/WorkspaceShell";
 import ReminderSettingsCard from "@/components/ReminderSettingsCard";
+import EmailReminderSettingsCard from "@/components/EmailReminderSettingsCard";
 import { getWorkspaceData } from "@/lib/workspace-data";
+import { getDueReminderEmailEnabledForUser } from "@/lib/notification-preferences";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const data = await getWorkspaceData();
+  const dueReminderEmailEnabled = await getDueReminderEmailEnabledForUser(
+    data.userId,
+  );
 
   return (
     <WorkspaceShell
@@ -23,6 +28,7 @@ export default async function SettingsPage() {
         </div>
         <div className="mt-4">
           <ReminderSettingsCard initialDays={data.reminderDaysBeforeDue} />
+          <EmailReminderSettingsCard initialEnabled={dueReminderEmailEnabled} />
         </div>
       </section>
     </WorkspaceShell>

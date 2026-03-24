@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ThumbsDown, ThumbsUp } from "lucide-react";
 import type { CheaperAlternativeOpportunity } from "@/lib/workspace-data";
 
 function formatCurrency(amount: number): string {
@@ -89,14 +90,14 @@ export default function CheaperAlternativesPanel({
 
   return (
     <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+      <div className="flex flex-col gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-xl font-semibold">AI Cheaper Alternatives</h2>
-          <p className="mt-1 text-sm text-[hsl(var(--muted-ink))]">
+          <h2 className="text-xl font-semibold text-white">AI Cheaper Alternatives</h2>
+          <p className="mt-1 text-sm text-white/85">
             Fast suggestions with pricing, savings, and confidence.
           </p>
         </div>
-        <span className="rounded-full bg-[hsl(var(--bg))] px-3 py-1 text-xs font-semibold text-[hsl(var(--muted-ink))]">
+        <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[hsl(var(--primary))]">
           {opportunities.length} opportunities
         </span>
       </div>
@@ -117,7 +118,7 @@ export default function CheaperAlternativesPanel({
             return (
               <article
                 key={item.opportunityKey}
-                className="rounded-xl border border-[hsl(var(--line))] bg-[linear-gradient(145deg,hsl(var(--bg)),hsl(var(--surface)))] p-4"
+                className="rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-sm font-medium">
@@ -162,13 +163,37 @@ export default function CheaperAlternativesPanel({
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-3 py-1.5 text-xs font-medium hover:bg-[hsl(var(--bg))] disabled:opacity-60"
-                    onClick={() => submitFeedback(item, "up")}
-                    disabled={currentVoteState.state === "saving"}
-                  >
-                    Helpful
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label="Mark as helpful"
+                      title="Helpful"
+                      className={`rounded-lg border p-2 transition-colors disabled:opacity-60 ${
+                        currentVoteState.vote === "up"
+                          ? "border-[hsl(var(--success))] bg-[hsl(var(--success-soft))] text-[hsl(var(--success))]"
+                          : "border-[hsl(var(--line))] bg-[hsl(var(--surface))] text-[hsl(var(--muted-ink))] hover:bg-[hsl(var(--bg))]"
+                      }`}
+                      onClick={() => submitFeedback(item, "up")}
+                      disabled={currentVoteState.state === "saving"}
+                    >
+                      <ThumbsUp className="h-4 w-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label="Mark as not useful"
+                      title="Not useful"
+                      className={`rounded-lg border p-2 transition-colors disabled:opacity-60 ${
+                        currentVoteState.vote === "down"
+                          ? "border-[hsl(var(--danger))] bg-[hsl(var(--danger-soft))] text-[hsl(var(--danger))]"
+                          : "border-[hsl(var(--line))] bg-[hsl(var(--surface))] text-[hsl(var(--muted-ink))] hover:bg-[hsl(var(--bg))]"
+                      }`}
+                      onClick={() => submitFeedback(item, "down")}
+                      disabled={currentVoteState.state === "saving"}
+                    >
+                      <ThumbsDown className="h-4 w-4" />
+                    </button>
+                  </div>
 
                   <select
                     className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-2.5 py-1.5 text-xs"
@@ -186,14 +211,6 @@ export default function CheaperAlternativesPanel({
                       </option>
                     ))}
                   </select>
-
-                  <button
-                    className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-3 py-1.5 text-xs font-medium hover:bg-[hsl(var(--bg))] disabled:opacity-60"
-                    onClick={() => submitFeedback(item, "down")}
-                    disabled={currentVoteState.state === "saving"}
-                  >
-                    Not useful
-                  </button>
                 </div>
 
                 {currentVoteState.message ? (

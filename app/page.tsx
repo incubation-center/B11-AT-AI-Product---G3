@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 export default function HomePage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[hsl(var(--bg))] text-[hsl(var(--ink))]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.22),transparent_45%),radial-gradient(circle_at_bottom_right,hsl(var(--warning)/0.16),transparent_40%)]" />
-
       <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-6 md:px-8">
         <header className="flex items-center justify-between">
-          <Link href="/" className="font-display text-2xl font-bold tracking-tight">
+          <Link
+            href="/"
+            className="font-display text-2xl font-bold tracking-tight"
+          >
             Duey
           </Link>
 
@@ -31,8 +32,8 @@ export default function HomePage() {
             Never miss a payment again.
           </h1>
           <p className="mt-5 max-w-2xl text-base text-[hsl(var(--muted-ink))] md:text-lg">
-            Duey helps you monitor subscriptions, track due dates, and catch unusual
-            charges before they become costly.
+            Duey helps you monitor subscriptions, track due dates, and catch
+            unusual charges before they become costly.
           </p>
 
           <div className="mt-10">
