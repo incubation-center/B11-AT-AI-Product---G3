@@ -1,4 +1,6 @@
+import Link from "next/link";
 import WorkspaceShell from "@/components/WorkspaceShell";
+import ExportCsvButton from "@/components/ExportCsvButton";
 import { getWorkspaceData } from "@/lib/workspace-data";
 
 function percent(part: number, total: number): string {
@@ -18,6 +20,10 @@ export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
   const data = await getWorkspaceData();
+  const { planConfig } = data;
+  const canExport = planConfig.features.exportCsv;
+  const canFinancialImpact = planConfig.features.financialImpact;
+
   const totalBills = data.userBills.length;
   const recurringShare =
     totalBills > 0 ? (data.recurringBills.length / totalBills) * 100 : 0;
@@ -67,20 +73,37 @@ export default async function ReportsPage() {
         <article className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
           <p className="text-sm text-[hsl(var(--muted-ink))]">Invoice Mix</p>
           <div className="mt-4 flex items-center gap-5">
-            <div className="relative h-36 w-36 rounded-full border-8 border-[hsl(var(--primary))] bg-[hsl(var(--surface))]">
+            <div
+              className="relative h-36 w-36 rounded-full"
+              style={{
+                background: `conic-gradient(hsl(var(--chart-1)) 0 ${recurringShare}%, hsl(var(--chart-2)) ${recurringShare}% 100%)`,
+              }}
+            >
               <div className="absolute inset-4 flex items-center justify-center rounded-full bg-[hsl(var(--surface))] text-sm font-semibold">
                 {totalBills}
               </div>
             </div>
-            <div className="space-y-2 text-sm">
+            <div className="flex-1 space-y-2 text-sm">
               <p className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--primary))]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--chart-1))]" />
                 Recurring: {data.recurringBills.length} ({Math.round(recurringShare)}%)
               </p>
               <p className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--accent))]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--chart-2))]" />
                 One-time: {data.oneTimeBills.length} ({Math.round(oneTimeShare)}%)
               </p>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-[hsl(var(--muted-soft))]">
+                <div className="flex h-full w-full">
+                  <div
+                    className="h-full bg-[hsl(var(--chart-1))]"
+                    style={{ width: `${recurringShare}%` }}
+                  />
+                  <div
+                    className="h-full bg-[hsl(var(--chart-2))]"
+                    style={{ width: `${oneTimeShare}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </article>
@@ -126,7 +149,7 @@ export default async function ReportsPage() {
               </div>
               <div className="h-2.5 overflow-hidden rounded-full bg-[hsl(var(--muted-soft))]">
                 <div
-                  className="h-full rounded-full bg-[hsl(var(--primary))]"
+                  className="h-full rounded-full bg-[hsl(var(--chart-1))]"
                   style={{
                     width:
                       maxServiceTotal > 0
@@ -137,6 +160,86 @@ export default async function ReportsPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Financial Impact — Pro only */}
+      <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">Financial Impact</p>
+          {!canFinancialImpact && (
+            <span className="rounded-full bg-[hsl(var(--primary))] px-2.5 py-0.5 text-xs font-semibold text-white">
+              Pro
+            </span>
+          )}
+        </div>
+        {canFinancialImpact ? (
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl bg-[hsl(var(--bg))] p-4">
+              <p className="text-xs text-[hsl(var(--muted-ink))]">Projected Annual Spend</p>
+              <p className="mt-1 text-2xl font-bold">
+                {formatCurrency(data.monthlySpend * 12)}
+              </p>
+            </div>
+            <div className="rounded-xl bg-[hsl(var(--bg))] p-4">
+              <p className="text-xs text-[hsl(var(--muted-ink))]">Potential Annual Savings</p>
+              <p className="mt-1 text-2xl font-bold text-[hsl(var(--success))]">
+                {formatCurrency(
+                  data.cheaperAlternativeOpportunities.reduce(
+                    (sum, o) => sum + o.estimatedYearlySavings,
+                    0,
+                  ),
+                )}
+              </p>
+            </div>
+            <div className="rounded-xl bg-[hsl(var(--bg))] p-4">
+              <p className="text-xs text-[hsl(var(--muted-ink))]">Recurring Services</p>
+              <p className="mt-1 text-2xl font-bold">{data.serviceSummary.length}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-col items-center gap-3 rounded-xl bg-[hsl(var(--bg))] py-8 text-center">
+            <p className="text-sm text-[hsl(var(--muted-ink))]">
+              Projected spend, potential savings, and financial health metrics.
+            </p>
+            <Link
+              href="/pricing"
+              className="rounded-xl bg-[hsl(var(--primary))] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+            >
+              Upgrade to Pro
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* Export — Pro only */}
+      <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Export Data</p>
+            <p className="mt-0.5 text-xs text-[hsl(var(--muted-ink))]">
+              Download all your bills as a CSV file.
+            </p>
+          </div>
+          {canExport ? (
+            <ExportCsvButton
+              bills={data.userBills.map((b) => ({
+                id: b.id,
+                serviceName: b.serviceName,
+                amount: b.amount,
+                billDate: b.billDate,
+                dueDate: b.dueDate ?? null,
+                invoiceType: b.invoiceType,
+              }))}
+            />
+          ) : (
+            <Link
+              href="/pricing"
+              className="rounded-xl border border-[hsl(var(--primary))] px-4 py-2 text-sm font-semibold text-[hsl(var(--primary))] hover:opacity-80"
+            >
+              Upgrade to Pro
+            </Link>
+          )}
         </div>
       </section>
     </WorkspaceShell>

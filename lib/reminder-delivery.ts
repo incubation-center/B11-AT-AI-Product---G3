@@ -105,3 +105,21 @@ export function toReminderDeliveryKey(params: {
 }): string {
   return makeDeliveryKey(params);
 }
+
+export type ReminderDeliveryHistoryItem = ReminderDeliveryRecord;
+
+export async function getReminderDeliveryHistoryForUser(params: {
+  userId: string;
+  limit?: number;
+}): Promise<ReminderDeliveryHistoryItem[]> {
+  const store = await readStore();
+  const safeLimit =
+    typeof params.limit === "number" && params.limit > 0
+      ? Math.floor(params.limit)
+      : 20;
+
+  return store.records
+    .filter((record) => record.userId === params.userId)
+    .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
+    .slice(0, safeLimit);
+}

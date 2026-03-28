@@ -1,5 +1,6 @@
 import DashboardSidebar from "@/components/DashboardSidebar";
 import DashboardUserMenu from "@/components/DashboardUserMenu";
+import { ModeToggle } from "@/components/mode-toggle";
 
 type SidebarCounts = {
   invoices: number;
@@ -36,7 +37,10 @@ export default function WorkspaceShell({
                   <h1 className="text-3xl font-bold text-white md:text-4xl">{title}</h1>
                   <p className="mt-2 text-white/85">{description}</p>
                 </div>
-                <DashboardUserMenu name={userName} />
+                <div className="flex items-center gap-2">
+                  <ModeToggle />
+                  <DashboardUserMenu name={userName} />
+                </div>
               </div>
             </div>
 

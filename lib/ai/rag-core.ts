@@ -50,6 +50,7 @@ export type BillRecord = {
   usage: number | null;
   isRecurring: boolean;
   invoiceType: InvoiceType;
+  recurrenceStatus: "active" | "stopped";
   classificationReason: string | null;
   classificationEvidence: string[];
   classificationConfidence: number | null;
@@ -300,12 +301,18 @@ function normalizeBillRecord(record: BillRecord): BillRecord {
     normalizeInvoiceType(record.invoiceType) ??
     (record.isRecurring === false ? "one_time" : "recurring");
 
+  const recurrenceStatus: "active" | "stopped" =
+    (record as BillRecord & { recurrenceStatus?: string }).recurrenceStatus === "stopped"
+      ? "stopped"
+      : "active";
+
   return {
     ...record,
     dueDate: typeof record.dueDate === "string" ? record.dueDate : null,
     usage: typeof record.usage === "number" ? record.usage : null,
     isRecurring: invoiceType === "recurring",
     invoiceType,
+    recurrenceStatus,
     classificationReason:
       typeof record.classificationReason === "string"
         ? record.classificationReason
@@ -341,6 +348,80 @@ export async function appendBillRecord(record: BillRecord): Promise<void> {
   } catch (error) {
     console.error("Failed to persist bill record to DB:", error);
   }
+}
+
+async function syncBillUpdateToDb(record: BillRecord): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    await db
+      .update(billsTable)
+      .set({
+        dueDate: record.dueDate ? new Date(record.dueDate) : null,
+        metadata: {
+          invoiceType: record.invoiceType,
+          isRecurring: record.isRecurring,
+          recurrenceStatus: record.recurrenceStatus,
+          classificationReason: record.classificationReason,
+          classificationEvidence: record.classificationEvidence,
+          classificationConfidence: record.classificationConfidence,
+        },
+      })
+      .where(eq(billsTable.id, record.id));
+  } catch (error) {
+    console.error("Failed to sync bill update to DB:", error);
+  }
+}
+
+export async function updateBillRecord(
+  id: string,
+  patch: Partial<BillRecord>,
+): Promise<BillRecord | null> {
+  const records = await readBillRecords();
+  const idx = records.findIndex((r) => r.id === id);
+  if (idx === -1) return null;
+  records[idx] = normalizeBillRecord({ ...records[idx], ...patch });
+  await writeFile(BILLS_PATH, JSON.stringify({ records }, null, 2), "utf8");
+  await syncBillUpdateToDb(records[idx]);
+  return records[idx];
+}
+
+function advanceDateByOneMonth(dateStr: string): string {
+  const d = new Date(dateStr);
+  d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function advanceRecurringBills(): Promise<number> {
+  const today = new Date().toISOString().slice(0, 10);
+  const records = await readBillRecords();
+  let advanced = 0;
+
+  const updated = records.map((bill) => {
+    if (
+      bill.isRecurring &&
+      bill.recurrenceStatus !== "stopped" &&
+      bill.dueDate &&
+      bill.dueDate <= today
+    ) {
+      advanced++;
+      return normalizeBillRecord({
+        ...bill,
+        dueDate: advanceDateByOneMonth(bill.dueDate),
+      });
+    }
+    return bill;
+  });
+
+  if (advanced > 0) {
+    await writeFile(BILLS_PATH, JSON.stringify({ records: updated }, null, 2), "utf8");
+    await Promise.all(
+      updated
+        .filter((b) => b.isRecurring && b.recurrenceStatus !== "stopped")
+        .map((b) => syncBillUpdateToDb(b).catch(() => null)),
+    );
+  }
+
+  return advanced;
 }
 
 export async function appendExecutionLog(payload: Record<string, unknown>) {
@@ -401,10 +482,17 @@ export async function embedText(text: string): Promise<number[]> {
     const result = await withRetry(() => model.embedContent(text));
     const values = result.embedding.values;
     if (!values || !Array.isArray(values) || values.length === 0) {
+      console.warn(
+        "[embedText] Gemini returned empty embedding — falling back to hash-based embedding. Search quality is degraded.",
+      );
       return buildFallbackEmbedding(text);
     }
     return values;
-  } catch {
+  } catch (err) {
+    console.warn(
+      "[embedText] Gemini embedding failed — falling back to hash-based embedding. Search quality is degraded.",
+      err instanceof Error ? err.message : err,
+    );
     return buildFallbackEmbedding(text);
   }
 }

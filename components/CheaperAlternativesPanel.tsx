@@ -1,8 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ThumbsDown, ThumbsUp, Sparkles } from "lucide-react";
 import type { CheaperAlternativeOpportunity } from "@/lib/workspace-data";
+
+type AiAlternative = {
+  provider: string;
+  plan: string;
+  monthly_price: number;
+  risk: "low" | "medium" | "high";
+  reason: string;
+  switching_cost: string;
+};
+
+type AiRefreshState = {
+  status: "idle" | "loading" | "done" | "error";
+  alternatives: AiAlternative[];
+  from_cache: boolean;
+  error: string | null;
+};
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -37,8 +53,68 @@ export default function CheaperAlternativesPanel({
 }: {
   opportunities: CheaperAlternativeOpportunity[];
 }) {
+  const ITEMS_PER_PAGE = 2;
   const [voteStateByKey, setVoteStateByKey] = useState<Record<string, VoteState>>({});
   const [reasonByKey, setReasonByKey] = useState<Record<string, string>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [aiByKey, setAiByKey] = useState<Record<string, AiRefreshState>>({});
+
+  async function refreshWithAI(
+    item: CheaperAlternativeOpportunity,
+    forceRefresh = false,
+  ) {
+    const key = item.opportunityKey;
+    setAiByKey((prev) => ({
+      ...prev,
+      [key]: { status: "loading", alternatives: [], from_cache: false, error: null },
+    }));
+    try {
+      const res = await fetch("/api/ai-alternatives", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_name: item.serviceName,
+          current_monthly: item.currentEstimatedMonthly,
+          force_refresh: forceRefresh,
+        }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      const data = (await res.json()) as {
+        alternatives: AiAlternative[];
+        from_cache: boolean;
+      };
+      setAiByKey((prev) => ({
+        ...prev,
+        [key]: {
+          status: "done",
+          alternatives: data.alternatives,
+          from_cache: data.from_cache,
+          error: null,
+        },
+      }));
+    } catch {
+      setAiByKey((prev) => ({
+        ...prev,
+        [key]: {
+          status: "error",
+          alternatives: [],
+          from_cache: false,
+          error: "Could not load AI suggestions. Try again.",
+        },
+      }));
+    }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(opportunities.length / ITEMS_PER_PAGE));
+
+  const pagedOpportunities = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return opportunities.slice(start, start + ITEMS_PER_PAGE);
+  }, [opportunities, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [opportunities.length]);
 
   async function submitFeedback(
     item: CheaperAlternativeOpportunity,
@@ -104,11 +180,15 @@ export default function CheaperAlternativesPanel({
 
       {opportunities.length === 0 ? (
         <p className="mt-4 text-sm text-[hsl(var(--muted-ink))]">
-          Not enough recurring billing signals yet. Upload more recurring invoices to unlock stronger recommendations.
+          No high-confidence opportunities yet. Upload more recurring invoices or add feedback to improve suggestion quality.
         </p>
       ) : (
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {opportunities.map((item) => {
+        <div className="mt-4 space-y-4">
+          <p className="text-xs text-[hsl(var(--muted-ink))]">
+            Showing latest 2 services per page ({currentPage}/{totalPages})
+          </p>
+          <div className="grid gap-3 lg:grid-cols-2">
+          {pagedOpportunities.map((item) => {
             const currentVoteState = voteStateByKey[item.opportunityKey] ?? {
               state: "idle",
               vote: item.feedbackSummary.userVote,
@@ -226,15 +306,113 @@ export default function CheaperAlternativesPanel({
                     <li>Data coverage score: {Math.round(item.confidenceBreakdown.dataCoverage * 100)}%</li>
                     <li>Category match score: {Math.round(item.confidenceBreakdown.categoryMatch * 100)}%</li>
                     <li>Price freshness score: {Math.round(item.confidenceBreakdown.priceFreshness * 100)}%</li>
+                    <li>Feedback signal score: {Math.round(item.confidenceBreakdown.feedbackSignal * 100)}%</li>
                     <li>
                       Baseline price: {formatCurrency(item.alternative.billedAmount)} per{" "}
                       {item.alternative.billingCycle} (updated {item.alternative.priceUpdatedAt})
                     </li>
                   </ul>
                 </details>
+
+                {/* AI-powered live suggestions */}
+                <div className="mt-3 rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--bg))] p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-[hsl(var(--muted-ink))]">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      AI Live Suggestions
+                    </p>
+                    <div className="flex gap-1.5">
+                      {aiByKey[item.opportunityKey]?.status === "done" && (
+                        <button
+                          type="button"
+                          onClick={() => refreshWithAI(item, true)}
+                          className="text-xs text-[hsl(var(--muted-ink))] underline"
+                        >
+                          Refresh
+                        </button>
+                      )}
+                      {(!aiByKey[item.opportunityKey] || aiByKey[item.opportunityKey]?.status === "idle") && (
+                        <button
+                          type="button"
+                          onClick={() => refreshWithAI(item)}
+                          className="rounded-lg bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90"
+                        >
+                          Ask AI
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {aiByKey[item.opportunityKey]?.status === "loading" && (
+                    <p className="mt-2 text-xs text-[hsl(var(--muted-ink))]">Generating suggestions…</p>
+                  )}
+
+                  {aiByKey[item.opportunityKey]?.status === "error" && (
+                    <p className="mt-2 text-xs text-[hsl(var(--danger))]">
+                      {aiByKey[item.opportunityKey].error}
+                    </p>
+                  )}
+
+                  {aiByKey[item.opportunityKey]?.status === "done" && (
+                    <div className="mt-2 space-y-2">
+                      {aiByKey[item.opportunityKey].from_cache && (
+                        <p className="text-xs text-[hsl(var(--muted-ink))]/70">Served from cache (≤7 days old)</p>
+                      )}
+                      {aiByKey[item.opportunityKey].alternatives.length === 0 ? (
+                        <p className="text-xs text-[hsl(var(--muted-ink))]">
+                          No cheaper alternatives found for this service at the current price.
+                        </p>
+                      ) : (
+                        aiByKey[item.opportunityKey].alternatives.map((alt) => (
+                          <div
+                            key={`${alt.provider}-${alt.plan}`}
+                            className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-2.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold">
+                                {alt.provider} — {alt.plan}
+                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-[hsl(var(--success))]">
+                                  {formatCurrency(alt.monthly_price)}/mo
+                                </span>
+                                <span className={`rounded-full px-2 py-0.5 text-xs capitalize ${riskClassName(alt.risk)}`}>
+                                  {alt.risk}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="mt-1 text-xs text-[hsl(var(--muted-ink))]">{alt.reason}</p>
+                            <p className="mt-0.5 text-xs text-[hsl(var(--muted-ink))]/70">
+                              Switch: {alt.switching_cost}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </article>
             );
           })}
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage <= 1}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </section>

@@ -16,6 +16,9 @@
   --danger: 0 77% 52%;
   --danger-soft: 0 88% 94%;
   --muted-soft: 207 42% 92%;
+  --chart-1: 188 72% 42%;
+  --chart-2: 166 64% 42%;
+  --chart-soft: 188 80% 93%;
 
   --background: hsl(var(--bg));
   --foreground: hsl(var(--ink));
@@ -43,6 +46,9 @@
   --danger: 0 89% 67%;
   --danger-soft: 0 51% 25%;
   --muted-soft: 217 23% 20%;
+  --chart-1: 188 72% 62%;
+  --chart-2: 166 64% 60%;
+  --chart-soft: 188 34% 22%;
 
   --background: hsl(var(--bg));
   --foreground: hsl(var(--ink));

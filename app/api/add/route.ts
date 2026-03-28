@@ -4,8 +4,11 @@ import { auth } from "@/lib/auth";
 import {
   appendBillRecord,
   parseLikelyDate,
+  readBillRecords,
   type InvoiceType,
 } from "@/lib/ai/rag-core";
+import { getPlanForUser } from "@/lib/user-plan";
+import { canAddBill, PLANS } from "@/lib/plans";
 
 type AddBody = {
   user_id?: string;
@@ -74,6 +77,25 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "amount must be a positive number" },
         { status: 400 },
+      );
+    }
+
+    const [userPlan, allBills] = await Promise.all([
+      getPlanForUser(userId),
+      readBillRecords(),
+    ]);
+    const userBillCount = allBills.filter((b) => b.userId === userId).length;
+    if (!canAddBill(userPlan, userBillCount)) {
+      const max = PLANS[userPlan].maxBills;
+      return NextResponse.json(
+        {
+          error: "plan_limit_reached",
+          detail: `Your ${userPlan} plan allows up to ${max} bills. Upgrade to add more.`,
+          current: userBillCount,
+          max,
+          plan: userPlan,
+        },
+        { status: 402 },
       );
     }
 

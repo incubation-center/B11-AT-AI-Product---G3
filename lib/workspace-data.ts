@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { readBillRecords, readStore, type BillRecord } from "@/lib/ai/rag-core";
+import { readBillRecords, readStore, advanceRecurringBills, type BillRecord } from "@/lib/ai/rag-core";
 import { getReminderDaysForUser } from "@/lib/reminder-preferences";
 import {
   getFeedbackSummaryByOpportunity,
@@ -9,6 +9,8 @@ import {
   type FeedbackReason,
   type FeedbackVote,
 } from "@/lib/cheaper-feedback";
+import { getPlanForUser } from "@/lib/user-plan";
+import { PLANS } from "@/lib/plans";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -55,11 +57,13 @@ type ConfidenceBreakdown = {
   dataCoverage: number;
   categoryMatch: number;
   priceFreshness: number;
+  feedbackSignal: number;
 };
 
 export type CheaperAlternativeOpportunity = {
   opportunityKey: string;
   serviceName: string;
+  latestBillDate: string;
   category: ServiceCategory;
   currentEstimatedMonthly: number;
   currentEstimatedYearly: number;
@@ -77,7 +81,10 @@ export type CheaperAlternativeOpportunity = {
   };
 };
 
-const CATEGORY_HINT_KEYWORDS: Array<{ category: ServiceCategory; keywords: string[] }> = [
+const CATEGORY_HINT_KEYWORDS: Array<{
+  category: ServiceCategory;
+  keywords: string[];
+}> = [
   {
     category: "video_streaming",
     keywords: ["stream", "video", "ott", "entertainment"],
@@ -116,19 +123,62 @@ const CATEGORY_HINT_KEYWORDS: Array<{ category: ServiceCategory; keywords: strin
   },
 ];
 
-const SERVICE_NAME_KEYWORDS: Array<{ category: ServiceCategory; keywords: string[] }> = [
-  { category: "video_streaming", keywords: ["netflix", "disney", "hulu", "hbo"] },
-  { category: "music_streaming", keywords: ["spotify", "apple music", "youtube music"] },
+const SERVICE_NAME_KEYWORDS: Array<{
+  category: ServiceCategory;
+  keywords: string[];
+}> = [
+  {
+    category: "video_streaming",
+    keywords: [
+      "netflix",
+      "disney",
+      "hulu",
+      "hbo",
+      "youtube",
+      "youtube premium",
+      "prime video",
+      "max",
+      "paramount",
+    ],
+  },
+  {
+    category: "music_streaming",
+    keywords: ["spotify", "apple music", "youtube music", "amazon music"],
+  },
   {
     category: "productivity",
-    keywords: ["notion", "slack", "microsoft 365", "google workspace", "atlassian"],
+    keywords: [
+      "notion",
+      "slack",
+      "microsoft 365",
+      "google workspace",
+      "atlassian",
+      "monday",
+      "asana",
+      "airtable",
+    ],
   },
-  { category: "cloud_storage", keywords: ["dropbox", "onedrive", "google drive", "icloud"] },
-  { category: "design", keywords: ["canva", "adobe", "figma"] },
-  { category: "password_manager", keywords: ["1password", "lastpass", "bitwarden", "dashlane"] },
-  { category: "vpn", keywords: ["nordvpn", "expressvpn", "surfshark"] },
-  { category: "email_marketing", keywords: ["mailchimp", "convertkit", "brevo"] },
-  { category: "accounting", keywords: ["quickbooks", "xero", "freshbooks"] },
+  {
+    category: "cloud_storage",
+    keywords: ["dropbox", "onedrive", "google drive", "icloud", "amazon drive"],
+  },
+  { category: "design", keywords: ["canva", "adobe", "figma", "sketch"] },
+  {
+    category: "password_manager",
+    keywords: ["1password", "lastpass", "bitwarden", "dashlane", "nordpass"],
+  },
+  {
+    category: "vpn",
+    keywords: ["nordvpn", "expressvpn", "surfshark", "protonvpn"],
+  },
+  {
+    category: "email_marketing",
+    keywords: ["mailchimp", "convertkit", "brevo", "constant contact"],
+  },
+  {
+    category: "accounting",
+    keywords: ["quickbooks", "xero", "freshbooks", "zoho"],
+  },
 ];
 
 const ALTERNATIVE_CATALOG: Record<ServiceCategory, AlternativeOption[]> = {
@@ -166,7 +216,8 @@ const ALTERNATIVE_CATALOG: Record<ServiceCategory, AlternativeOption[]> = {
       pricingSource: "Internal catalog baseline",
       priceUpdatedAt: "2026-03-01",
       risk: "low",
-      reason: "Comparable catalog and playlist support at similar or lower price.",
+      reason:
+        "Comparable catalog and playlist support at similar or lower price.",
     },
   ],
   productivity: [
@@ -296,6 +347,10 @@ const ALTERNATIVE_CATALOG: Record<ServiceCategory, AlternativeOption[]> = {
   unknown: [],
 };
 
+const MIN_MONTHLY_SAVINGS = 0.5;
+const MIN_CONFIDENCE = 0.45;
+const MAX_PRICE_STALENESS_DAYS = 180;
+
 function toStartOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -328,7 +383,11 @@ function buildDueReminders(
     if (daysUntilDue > reminderDaysBeforeDue) continue;
 
     const status: DueReminderStatus =
-      daysUntilDue < 0 ? "overdue" : daysUntilDue === 0 ? "due_today" : "due_soon";
+      daysUntilDue < 0
+        ? "overdue"
+        : daysUntilDue === 0
+          ? "due_today"
+          : "due_soon";
 
     items.push({
       billId: bill.id,
@@ -346,7 +405,10 @@ function buildDueReminders(
   return items.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
 }
 
-function inferCategory(serviceName: string, categoryHint: string | null): ServiceCategory {
+function inferCategory(
+  serviceName: string,
+  categoryHint: string | null,
+): ServiceCategory {
   const name = serviceName.toLowerCase();
   const hint = (categoryHint ?? "").toLowerCase();
 
@@ -378,6 +440,10 @@ function daysSince(isoDate: string, now: Date): number {
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 function buildCheaperAlternativeOpportunities(
@@ -415,57 +481,50 @@ function buildCheaperAlternativeOpportunities(
 
   for (const [serviceKey, serviceBills] of billsByService) {
     const displayName = serviceBills[0]?.serviceName ?? serviceKey;
-    const sorted = [...serviceBills].sort((a, b) => b.billDate.localeCompare(a.billDate));
+    const displayNameNormalized = normalizeName(displayName);
+    const sorted = [...serviceBills].sort((a, b) =>
+      b.billDate.localeCompare(a.billDate),
+    );
     const latestAmount = sorted[0]?.amount ?? 0;
     const averageAmount = avg(serviceBills.map((bill) => bill.amount));
     const currentMonthly = latestAmount > 0 ? latestAmount : averageAmount;
     if (currentMonthly < 3) continue;
 
-    const category = inferCategory(displayName, hintByService.get(serviceKey) ?? null);
+    const category = inferCategory(
+      displayName,
+      hintByService.get(serviceKey) ?? null,
+    );
     if (category === "unknown") continue;
 
     const options = ALTERNATIVE_CATALOG[category];
     if (options.length === 0) continue;
 
     const cheaperOption = options
-      .filter((option) => option.monthlyPrice < currentMonthly)
+      .filter(
+        (option) =>
+          option.monthlyPrice < currentMonthly &&
+          !displayNameNormalized.includes(normalizeName(option.provider)),
+      )
       .sort((a, b) => a.monthlyPrice - b.monthlyPrice)[0];
 
     if (!cheaperOption) continue;
 
-    const monthlySavings = Number((currentMonthly - cheaperOption.monthlyPrice).toFixed(2));
-    if (monthlySavings < 1) continue;
+    const monthlySavings = Number(
+      (currentMonthly - cheaperOption.monthlyPrice).toFixed(2),
+    );
+    if (monthlySavings < MIN_MONTHLY_SAVINGS) continue;
 
     const yearlySavings = Number((monthlySavings * 12).toFixed(2));
 
     const dataCoverage = clamp01(serviceBills.length / 3);
     const categoryMatch = hintByService.get(serviceKey) ? 1 : 0.75;
-    const priceAdvantage = clamp01(monthlySavings / Math.max(currentMonthly, 1));
+    const priceAdvantage = clamp01(
+      monthlySavings / Math.max(currentMonthly, 1),
+    );
     const freshnessDays = daysSince(cheaperOption.priceUpdatedAt, now);
-    const priceFreshness = clamp01(1 - freshnessDays / 180);
-
-    let confidence =
-      priceAdvantage * 0.35 +
-      dataCoverage * 0.25 +
-      categoryMatch * 0.2 +
-      priceFreshness * 0.2;
-    const evidence: string[] = [];
-
-    evidence.push(`Current estimated monthly cost from recent recurring invoices: ${currentMonthly.toFixed(2)}.`);
-    evidence.push(`Comparable option in category: ${category.replaceAll("_", " ")}.`);
-    evidence.push(`Alternative pricing baseline updated on ${cheaperOption.priceUpdatedAt}.`);
-
-    if (serviceBills.length >= 2) {
-      evidence.push(`Confidence boosted by ${serviceBills.length} recurring invoice records.`);
-    }
-
-    if (hintByService.get(serviceKey)) {
-      evidence.push("Category hint detected from uploaded document metadata.");
-    }
-
-    if (monthlySavings >= currentMonthly * 0.3) {
-      evidence.push("High relative savings (>30%) suggests meaningful optimization opportunity.");
-    }
+    const priceFreshness = clamp01(
+      1 - freshnessDays / MAX_PRICE_STALENESS_DAYS,
+    );
 
     const opportunityKey = makeOpportunityKey(
       displayName,
@@ -479,14 +538,63 @@ function buildCheaperAlternativeOpportunities(
       userReason: null,
     };
 
-    if (feedback.userVote === "up") confidence += 0.08;
-    if (feedback.userVote === "down") confidence -= 0.12;
+    const totalVotes = feedback.upvotes + feedback.downvotes;
+    const netVotes =
+      totalVotes > 0 ? (feedback.upvotes - feedback.downvotes) / totalVotes : 0;
+    const crowdFeedbackSignal = clamp01((netVotes + 1) / 2);
+    const userFeedbackSignal =
+      feedback.userVote === "up" ? 1 : feedback.userVote === "down" ? 0 : 0.5;
+    const feedbackSignal = clamp01(
+      crowdFeedbackSignal * 0.6 + userFeedbackSignal * 0.4,
+    );
+
+    const evidence: string[] = [];
+    evidence.push(
+      `Current estimated monthly cost from recent recurring invoices: ${currentMonthly.toFixed(2)}.`,
+    );
+    evidence.push(
+      `Comparable option in category: ${category.replaceAll("_", " ")}.`,
+    );
+    evidence.push(
+      `Alternative pricing baseline updated on ${cheaperOption.priceUpdatedAt}.`,
+    );
+
+    if (serviceBills.length >= 2) {
+      evidence.push(
+        `Confidence boosted by ${serviceBills.length} recurring invoice records.`,
+      );
+    }
+
+    if (hintByService.get(serviceKey)) {
+      evidence.push("Category hint detected from uploaded document metadata.");
+    }
+
+    if (monthlySavings >= currentMonthly * 0.3) {
+      evidence.push(
+        "High relative savings (>30%) suggests meaningful optimization opportunity.",
+      );
+    }
+
+    if (totalVotes > 0) {
+      evidence.push(
+        `Community feedback signal: ${feedback.upvotes} helpful vs ${feedback.downvotes} not useful votes.`,
+      );
+    }
+
+    let confidence =
+      priceAdvantage * 0.32 +
+      dataCoverage * 0.22 +
+      categoryMatch * 0.16 +
+      priceFreshness * 0.16 +
+      feedbackSignal * 0.14;
 
     confidence = Math.max(0.35, Math.min(0.95, Number(confidence.toFixed(2))));
+    if (confidence < MIN_CONFIDENCE) continue;
 
     opportunities.push({
       opportunityKey,
       serviceName: displayName,
+      latestBillDate: sorted[0]?.billDate ?? new Date(0).toISOString().slice(0, 10),
       category,
       currentEstimatedMonthly: Number(currentMonthly.toFixed(2)),
       currentEstimatedYearly: Number((currentMonthly * 12).toFixed(2)),
@@ -499,6 +607,7 @@ function buildCheaperAlternativeOpportunities(
         dataCoverage: Number(dataCoverage.toFixed(2)),
         categoryMatch: Number(categoryMatch.toFixed(2)),
         priceFreshness: Number(priceFreshness.toFixed(2)),
+        feedbackSignal: Number(feedbackSignal.toFixed(2)),
       },
       evidence,
       feedbackSummary: feedback,
@@ -507,10 +616,15 @@ function buildCheaperAlternativeOpportunities(
 
   return opportunities
     .sort((a, b) => {
+      if (b.latestBillDate !== a.latestBillDate) {
+        return b.latestBillDate.localeCompare(a.latestBillDate);
+      }
+      const scoreA = a.confidence * a.estimatedMonthlySavings;
+      const scoreB = b.confidence * b.estimatedMonthlySavings;
+      if (scoreB !== scoreA) return scoreB - scoreA;
       if (b.confidence !== a.confidence) return b.confidence - a.confidence;
       return b.estimatedMonthlySavings - a.estimatedMonthlySavings;
-    })
-    .slice(0, 6);
+    });
 }
 
 export async function getWorkspaceData() {
@@ -522,14 +636,20 @@ export async function getWorkspaceData() {
     redirect("/sign-in");
   }
 
+  await advanceRecurringBills().catch(() => null);
+
   const [store, bills] = await Promise.all([
     readStore().catch(() => ({ documents: [], chunks: [] })),
     readBillRecords().catch(() => []),
   ]);
 
   const userId = session.user.id;
-  const feedbackSummary = await getFeedbackSummaryByOpportunity(userId);
-  const reminderDaysBeforeDue = await getReminderDaysForUser(userId);
+  const [feedbackSummary, reminderDaysBeforeDue, userPlan] = await Promise.all([
+    getFeedbackSummaryByOpportunity(userId),
+    getReminderDaysForUser(userId),
+    getPlanForUser(userId),
+  ]);
+  const planConfig = PLANS[userPlan];
   const userDocs = store.documents.filter((d) => d.userId === userId);
   const userBills = bills.filter((b) => b.userId === userId);
   const recurringBills = userBills.filter((bill) => bill.isRecurring);
@@ -537,7 +657,11 @@ export async function getWorkspaceData() {
   const contractCount = userDocs.filter((d) => d.docType === "contract").length;
 
   const now = new Date();
-  const dueReminders = buildDueReminders(recurringBills, reminderDaysBeforeDue, now);
+  const dueReminders = buildDueReminders(
+    recurringBills,
+    reminderDaysBeforeDue,
+    now,
+  );
   const dueReminderIds = new Set(dueReminders.map((item) => item.billId));
   const dueAlerts = recurringBills.filter((bill) =>
     dueReminderIds.has(bill.id),
@@ -649,5 +773,7 @@ export async function getWorkspaceData() {
       documents: userDocs.length,
     },
     reminderDaysBeforeDue,
+    userPlan,
+    planConfig,
   };
 }

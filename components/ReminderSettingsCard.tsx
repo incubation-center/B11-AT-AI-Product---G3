@@ -58,7 +58,7 @@ export default function ReminderSettingsCard({
         <p className="mt-2 text-xs text-destructive">{error}</p>
       )}
       <Button
-        className="mt-3 bg-[hsl(var(--ink))] text-[hsl(var(--surface))] hover:opacity-90"
+        className="mt-3 bg-[hsl(var(--primary))] text-white hover:opacity-90"
         onClick={save}
         disabled={isPending}
       >

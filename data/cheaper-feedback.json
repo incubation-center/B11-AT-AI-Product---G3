@@ -107,6 +107,30 @@
       "reason": "savings_too_small",
       "note": null,
       "createdAt": "2026-03-24T16:52:44.546Z"
+    },
+    {
+      "id": "dae82e91-e821-4fce-b28c-76b375625fbf",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "netflix::disney+::standard with ads",
+      "serviceName": "Netflix",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "up",
+      "reason": null,
+      "note": null,
+      "createdAt": "2026-03-25T16:14:00.455Z"
+    },
+    {
+      "id": "79f805c8-2d45-4867-b2bb-5d2a35a1991d",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "opportunityKey": "youtube premium::disney+::standard with ads",
+      "serviceName": "YouTube Premium",
+      "alternativeProvider": "Disney+",
+      "alternativePlan": "Standard with Ads",
+      "vote": "up",
+      "reason": null,
+      "note": null,
+      "createdAt": "2026-03-25T16:26:22.812Z"
     }
   ]
 }

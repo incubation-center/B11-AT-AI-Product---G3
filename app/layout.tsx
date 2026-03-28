@@ -31,7 +31,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <>
       <html lang="en" suppressHydrationWarning>
         <head />
-        <body className={`${dmSans.variable} ${outfit.variable}`}>
+        <body className={`${dmSans.variable} ${outfit.variable}`} suppressHydrationWarning>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"

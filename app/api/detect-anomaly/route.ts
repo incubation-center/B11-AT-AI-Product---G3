@@ -68,10 +68,23 @@ export async function POST(request: Request) {
       )
       .sort((a, b) => a.billDate.localeCompare(b.billDate));
 
+    // Rolling 3-month average as baseline instead of just the previous bill
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const recentHistory = history.filter(
+      (row) => new Date(row.billDate) >= threeMonthsAgo,
+    );
+
+    const baseline =
+      recentHistory.length > 0
+        ? recentHistory.reduce((sum, r) => sum + r.amount, 0) / recentHistory.length
+        : history.length > 0
+          ? history[history.length - 1].amount
+          : null;
+
     const previous = history.length > 0 ? history[history.length - 1] : null;
-    const previousAmount = previous?.amount ?? null;
-    const delta =
-      previousAmount !== null ? currentAmount - previousAmount : null;
+    const previousAmount = baseline;
+    const delta = previousAmount !== null ? currentAmount - previousAmount : null;
     const changePercent =
       previousAmount !== null && previousAmount > 0
         ? (delta! / previousAmount) * 100
@@ -84,8 +97,13 @@ export async function POST(request: Request) {
       previous?.usage !== undefined &&
       typeof body.current_usage === "number" &&
       body.current_usage > previous.usage
-        ? "Current usage is higher than previous bill."
+        ? `Current usage (${body.current_usage}) is higher than previous bill usage (${previous.usage}).`
         : "No clear usage increase signal.";
+
+    const baselineNote =
+      recentHistory.length > 1
+        ? `Baseline is a ${recentHistory.length}-bill rolling average over the last 3 months ($${previousAmount?.toFixed(2)}).`
+        : `Baseline is the single most recent bill ($${previousAmount?.toFixed(2)}).`;
 
     const contractHits = await semanticSearch({
       query:
@@ -108,9 +126,9 @@ export async function POST(request: Request) {
         "is_anomaly, previous_amount, current_amount, change_percent, cause_type, cause_summary, contract_evidence.",
       ].join(" "),
       [
-        `previous_amount: ${previousAmount}`,
+        `baseline_amount: ${previousAmount?.toFixed(2) ?? "null"} (${baselineNote})`,
         `current_amount: ${currentAmount}`,
-        `change_percent: ${changePercent}`,
+        `change_percent: ${changePercent?.toFixed(2) ?? "null"}`,
         `is_anomaly_rule_result: ${isAnomaly}`,
         `usage_hint: ${usageHint}`,
         "contract_chunks:",

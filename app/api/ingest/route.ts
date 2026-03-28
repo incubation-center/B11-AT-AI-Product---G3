@@ -9,7 +9,10 @@ import {
   extractTextFromFileWithLayout,
   parseLikelyDate,
   parseLooseMoney,
+  readBillRecords,
 } from "@/lib/ai/rag-core";
+import { getPlanForUser } from "@/lib/user-plan";
+import { canAddBill } from "@/lib/plans";
 
 type DocClassification = {
   doc_type: "contract" | "bill" | "other";
@@ -302,6 +305,26 @@ export async function POST(request: Request) {
       mimeType: file.type,
       extractedText,
     });
+
+    const [userPlan, allBills] = await Promise.all([
+      getPlanForUser(userId),
+      readBillRecords(),
+    ]);
+    const userBillCount = allBills.filter((b) => b.userId === userId).length;
+    if (!canAddBill(userPlan, userBillCount)) {
+      const { PLANS } = await import("@/lib/plans");
+      const max = PLANS[userPlan].maxBills;
+      return NextResponse.json(
+        {
+          error: "plan_limit_reached",
+          detail: `Your ${userPlan} plan allows up to ${max} bills. Upgrade to add more.`,
+          current: userBillCount,
+          max,
+          plan: userPlan,
+        },
+        { status: 402 },
+      );
+    }
 
     let billRecord = null;
     if (docType === "bill" && serviceName) {

@@ -84,9 +84,11 @@ export default function DocumentsGrid({
   userId: string;
 }) {
   const router = useRouter();
+  const ITEMS_PER_PAGE = 6;
   const [selected, setSelected] = useState<DocRecord | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   async function handleDelete(docId: string) {
     setDeletingId(docId);
@@ -128,10 +130,16 @@ export default function DocumentsGrid({
     b.createdAt.localeCompare(a.createdAt),
   );
 
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE));
+  const paged = sorted.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
+
   return (
     <>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {sorted.map((doc) => {
+        {paged.map((doc) => {
           const bill = billByDocId.get(doc.id);
           const isOverdue = bill?.dueDate && new Date(bill.dueDate) < now;
           const isDueSoon =
@@ -277,6 +285,37 @@ export default function DocumentsGrid({
           );
         })}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-xs text-[hsl(var(--muted-ink))]">
+            Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+            {Math.min(currentPage * ITEMS_PER_PAGE, sorted.length)} of{" "}
+            {sorted.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+            >
+              Previous
+            </button>
+            <span className="text-xs text-[hsl(var(--muted-ink))]">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              className="rounded-lg border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {selected && (
         <DocumentDetailModal
