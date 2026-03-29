@@ -28,38 +28,19 @@ type NavItem = {
   label: string;
   icon: ComponentType<{ className?: string }>;
   countKey?: keyof SidebarCounts;
+  iconColor: string;
 };
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  {
-    href: "/invoices",
-    label: "Invoices",
-    icon: ReceiptText,
-    countKey: "invoices",
-  },
-  {
-    href: "/documents",
-    label: "Documents",
-    icon: Files,
-    countKey: "documents",
-  },
-  {
-    href: "/alerts",
-    label: "Alerts",
-    icon: TriangleAlert,
-    countKey: "alerts",
-  },
-  {
-    href: "/services",
-    label: "Services",
-    icon: Building2,
-    countKey: "services",
-  },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/reports", label: "Reports", icon: ChartColumn },
-  { href: "/pricing", label: "Subscription", icon: CreditCard },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, iconColor: "text-blue-500" },
+  { href: "/invoices",  label: "Invoices",  icon: ReceiptText,    iconColor: "text-indigo-500", countKey: "invoices" },
+  { href: "/documents", label: "Documents", icon: Files,           iconColor: "text-violet-500", countKey: "documents" },
+  { href: "/alerts",    label: "Alerts",    icon: TriangleAlert,   iconColor: "text-amber-500",  countKey: "alerts" },
+  { href: "/services",  label: "Services",  icon: Building2,       iconColor: "text-teal-500",   countKey: "services" },
+  { href: "/calendar",  label: "Calendar",  icon: CalendarDays,    iconColor: "text-cyan-500" },
+  { href: "/reports",   label: "Reports",   icon: ChartColumn,     iconColor: "text-emerald-500" },
+  { href: "/pricing",   label: "Subscription", icon: CreditCard,  iconColor: "text-pink-500" },
+  { href: "/settings",  label: "Settings",  icon: Settings,        iconColor: "text-slate-400" },
 ];
 
 export default function DashboardSidebar({
@@ -71,10 +52,30 @@ export default function DashboardSidebar({
 
   return (
     <nav className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface)/0.9)] p-3 shadow-sm lg:h-full lg:rounded-none lg:border-0 lg:bg-transparent lg:p-5 lg:shadow-none">
-      <div className="-mx-3 -mt-3 mb-3 bg-[hsl(var(--primary))] px-3 py-4  lg:-mx-5 lg:-mt-5 lg:mb-4 lg:px-5 lg:py-5">
-        <p className="text-3xl font-bold tracking-tight text-white lg:text-2xl">Duey</p>
+      {/* Header */}
+      <div className="-mx-3 -mt-3 mb-4 overflow-hidden lg:-mx-5 lg:-mt-5 lg:mb-5">
+        <div className="relative bg-linear-to-br from-blue-600 via-blue-500 to-cyan-500 px-5 py-5">
+          {/* subtle pattern */}
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
+              backgroundSize: "20px 20px",
+            }}
+          />
+          <div className="relative flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+              <span className="text-sm font-black text-white">D</span>
+            </div>
+            <div>
+              <p className="text-lg font-bold leading-none tracking-tight text-white">Duey</p>
+              <p className="mt-0.5 text-[10px] font-medium text-white/60 tracking-wide">Bill Tracker</p>
+            </div>
+          </div>
+        </div>
       </div>
-      <ul className="space-y-1">
+
+      <ul className="space-y-0.5">
         {navItems.map((item) => {
           const Icon = item.icon;
           const count = item.countKey ? counts[item.countKey] : null;
@@ -91,8 +92,8 @@ export default function DashboardSidebar({
                     : "text-[hsl(var(--ink))] hover:text-[hsl(var(--primary))]",
                 )}
               >
-                <span className="flex items-center gap-2">
-                  <Icon className={cn("h-4 w-4", isActive && "text-[hsl(var(--primary))]")} />
+                <span className="flex items-center gap-2.5">
+                  <Icon className={cn("h-4 w-4 shrink-0", item.iconColor)} />
                   <span>{item.label}</span>
                 </span>
                 {typeof count === "number" && (

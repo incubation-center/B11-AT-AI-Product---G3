@@ -9,9 +9,9 @@ export default function HomePage() {
     <main className="relative min-h-screen overflow-hidden bg-[#0a0f1e] text-white">
       {/* Background gradient blobs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-blue-600/20 blur-[120px]" />
-        <div className="absolute -right-40 top-1/3 h-[500px] w-[500px] rounded-full bg-indigo-500/15 blur-[100px]" />
-        <div className="absolute bottom-0 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[100px]" />
+        <div className="absolute -left-40 -top-40 h-150 w-150 rounded-full bg-blue-600/20 blur-[120px]" />
+        <div className="absolute -right-40 top-1/3 h-125 w-125 rounded-full bg-indigo-500/15 blur-[100px]" />
+        <div className="absolute bottom-0 left-1/2 h-100 w-150 -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[100px]" />
         {/* Grid overlay */}
         <div
           className="absolute inset-0 opacity-[0.04]"
@@ -54,7 +54,7 @@ export default function HomePage() {
           </span>
           <h1 className="max-w-3xl text-5xl font-bold leading-tight tracking-tight md:text-7xl">
             Never miss a{" "}
-            <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
               payment
             </span>{" "}
             again.

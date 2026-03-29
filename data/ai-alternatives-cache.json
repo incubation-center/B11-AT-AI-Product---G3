@@ -1,0 +1,66 @@
+{
+  "entries": {
+    "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16:youtube premium": {
+      "service_name": "YouTube Premium",
+      "current_monthly": 13.99,
+      "alternatives": [
+        {
+          "provider": "Spotify Premium",
+          "plan": "Individual",
+          "monthly_price": 9.99,
+          "risk": "low",
+          "reason": "Offers ad-free music streaming and offline listening at a lower cost.",
+          "switching_cost": "Simply sign up for a Spotify account and transfer your playlists."
+        },
+        {
+          "provider": "Amazon Prime Video",
+          "plan": "Prime Video",
+          "monthly_price": 8.99,
+          "risk": "low",
+          "reason": "Provides access to a wide range of movies and TV shows with the added benefit of Amazon Prime shipping.",
+          "switching_cost": "Subscribe to Amazon Prime and start enjoying Prime Video content."
+        },
+        {
+          "provider": "Apple Music",
+          "plan": "Individual",
+          "monthly_price": 9.99,
+          "risk": "low",
+          "reason": "Enjoy a vast music library and exclusive content at a lower price point.",
+          "switching_cost": "Create an Apple ID and start using Apple Music."
+        }
+      ],
+      "generated_at": "2026-03-29T04:13:48.767Z"
+    },
+    "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16:spotify": {
+      "service_name": "Spotify",
+      "current_monthly": 11.99,
+      "alternatives": [
+        {
+          "provider": "Apple Music",
+          "plan": "Individual",
+          "monthly_price": 9.99,
+          "risk": "low",
+          "reason": "Similar music library and features to Spotify.",
+          "switching_cost": "Simply sign up for a new account and transfer your playlists."
+        },
+        {
+          "provider": "Amazon Music Unlimited",
+          "plan": "Individual",
+          "monthly_price": 7.99,
+          "risk": "low",
+          "reason": "Competitive pricing with a vast music catalog.",
+          "switching_cost": "Create an account and import your playlists."
+        },
+        {
+          "provider": "YouTube Music Premium",
+          "plan": "Individual",
+          "monthly_price": 9.99,
+          "risk": "low",
+          "reason": "Access to music videos and ad-free listening at a lower cost.",
+          "switching_cost": "Subscribe and link your Google account for easy migration."
+        }
+      ],
+      "generated_at": "2026-03-29T04:15:36.297Z"
+    }
+  }
+}

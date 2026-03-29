@@ -39,7 +39,7 @@ export default async function ServicesPage() {
     >
       <section className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-160 text-left text-sm">
             <thead>
               <tr className="border-b border-[hsl(var(--line))] text-[hsl(var(--muted-ink))]">
                 <th className="py-2 font-medium">Service</th>

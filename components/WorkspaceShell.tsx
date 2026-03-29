@@ -25,11 +25,11 @@ export default function WorkspaceShell({
   return (
     <main className="relative min-h-screen overflow-hidden bg-[hsl(var(--bg))] text-[hsl(var(--ink))]">
       <div className="relative">
-        <aside className="lg:fixed lg:inset-y-0 lg:left-0 lg:w-[272px] lg:border-r lg:border-[hsl(var(--line))] lg:bg-[hsl(var(--surface))]">
+        <aside className="lg:fixed lg:inset-y-0 lg:left-0 lg:w-68 lg:border-r lg:border-[hsl(var(--line))] lg:bg-[hsl(var(--surface))]">
           <DashboardSidebar counts={sidebarCounts} />
         </aside>
 
-        <div className="p-4 md:p-8 lg:ml-[272px]">
+        <div className="p-4 md:p-8 lg:ml-68">
           <div className="space-y-6">
             <div className="rounded-3xl border border-[hsl(var(--primary))] bg-[hsl(var(--primary))] p-6 shadow-sm">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
