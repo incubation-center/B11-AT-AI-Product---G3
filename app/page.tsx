@@ -84,15 +84,15 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.2 }}
-          className="mt-16 w-full"
+          className="mt-16 w-full [perspective:1400px]"
         >
-          <div className="relative rounded-2xl border border-white/10 bg-white/5 p-1 shadow-2xl backdrop-blur-sm">
+          <div className="relative mx-auto rounded-2xl border border-white/10 bg-white/5 p-1 shadow-2xl backdrop-blur-sm transition-transform duration-500 md:[transform:rotateX(18deg)_scale(1.03)] md:hover:[transform:rotateX(14deg)_translateY(-6px)_scale(1.035)]">
             {/* Mockup top bar */}
             <div className="flex items-center gap-1.5 rounded-t-xl bg-white/5 px-4 py-3">
               <span className="h-3 w-3 rounded-full bg-red-400/60" />
               <span className="h-3 w-3 rounded-full bg-yellow-400/60" />
               <span className="h-3 w-3 rounded-full bg-green-400/60" />
-              <span className="ml-4 text-xs text-white/30">duey.app/dashboard</span>
+              <span className="ml-4 text-xs text-white/30">dashboard</span>
             </div>
 
             {/* Mockup content */}
@@ -100,14 +100,14 @@ export default function HomePage() {
               {/* Stat row */}
               <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                  { label: "Invoices", value: "12", color: "border-l-blue-500" },
-                  { label: "Recurring", value: "9", color: "border-l-cyan-500" },
-                  { label: "Alerts", value: "4", color: "border-l-amber-400" },
-                  { label: "This Month", value: "$1,107", color: "border-l-green-500" },
+                  { label: "Invoices", value: "12" },
+                  { label: "Recurring", value: "9" },
+                  { label: "Alerts", value: "4" },
+                  { label: "This Month", value: "$1,107" },
                 ].map((s) => (
                   <div
                     key={s.label}
-                    className={`rounded-xl border-l-4 border border-white/5 bg-white/5 p-3 ${s.color}`}
+                    className="rounded-xl border border-white/5 bg-white/5 p-3"
                   >
                     <p className="text-xs text-white/40">{s.label}</p>
                     <p className="mt-1 text-lg font-bold">{s.value}</p>
@@ -146,6 +146,9 @@ export default function HomePage() {
                 ))}
               </div>
             </div>
+
+            {/* Floor shadow for depth */}
+            <div className="pointer-events-none absolute -bottom-10 left-1/2 h-16 w-[82%] -translate-x-1/2 rounded-full bg-cyan-400/20 blur-2xl md:-bottom-12 md:h-20 md:blur-3xl" />
           </div>
         </motion.div>
       </section>

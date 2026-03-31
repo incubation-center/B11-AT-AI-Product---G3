@@ -370,17 +370,23 @@ function calcDaysUntilDue(dueDate: Date, now: Date): number {
 
 function buildDueReminders(
   recurringBills: BillRecord[],
-  reminderDaysBeforeDue: number,
+  reminderDays: number[],
   now: Date,
 ): DueReminder[] {
+  const maxWindow = Math.max(...reminderDays, 0);
   const items: DueReminder[] = [];
+  const seen = new Set<string>();
 
   for (const bill of recurringBills) {
     const due = parseDueDate(bill.dueDate);
     if (!due) continue;
 
     const daysUntilDue = calcDaysUntilDue(due, now);
-    if (daysUntilDue > reminderDaysBeforeDue) continue;
+    if (daysUntilDue > maxWindow) continue;
+    if (seen.has(bill.id)) continue;
+    seen.add(bill.id);
+
+    const matchingDay = reminderDays.find((d) => daysUntilDue <= d) ?? reminderDays[0];
 
     const status: DueReminderStatus =
       daysUntilDue < 0
@@ -396,7 +402,7 @@ function buildDueReminders(
       amount: bill.amount,
       daysUntilDue,
       reminderDate: new Date(
-        due.getTime() - reminderDaysBeforeDue * DAY_MS,
+        due.getTime() - matchingDay * DAY_MS,
       ).toISOString(),
       status,
     });

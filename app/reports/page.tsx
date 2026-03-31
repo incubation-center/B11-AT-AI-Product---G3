@@ -43,9 +43,12 @@ export default async function ReportsPage() {
   ).length;
   const totalDueStatus = dueSoonCount + dueTodayCount + overdueCount;
 
-  const dueSoonWidth = totalDueStatus > 0 ? (dueSoonCount / totalDueStatus) * 100 : 0;
-  const dueTodayWidth = totalDueStatus > 0 ? (dueTodayCount / totalDueStatus) * 100 : 0;
-  const overdueWidth = totalDueStatus > 0 ? (overdueCount / totalDueStatus) * 100 : 0;
+  const dueSoonWidth =
+    totalDueStatus > 0 ? (dueSoonCount / totalDueStatus) * 100 : 0;
+  const dueTodayWidth =
+    totalDueStatus > 0 ? (dueTodayCount / totalDueStatus) * 100 : 0;
+  const overdueWidth =
+    totalDueStatus > 0 ? (overdueCount / totalDueStatus) * 100 : 0;
 
   return (
     <WorkspaceShell
@@ -86,11 +89,13 @@ export default async function ReportsPage() {
             <div className="flex-1 space-y-2 text-sm">
               <p className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--chart-1))]" />
-                Recurring: {data.recurringBills.length} ({Math.round(recurringShare)}%)
+                Recurring: {data.recurringBills.length} (
+                {Math.round(recurringShare)}%)
               </p>
               <p className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--chart-2))]" />
-                One-time: {data.oneTimeBills.length} ({Math.round(oneTimeShare)}%)
+                One-time: {data.oneTimeBills.length} ({Math.round(oneTimeShare)}
+                %)
               </p>
               <div className="h-2.5 w-full overflow-hidden rounded-full bg-[hsl(var(--muted-soft))]">
                 <div className="flex h-full w-full">
@@ -109,12 +114,23 @@ export default async function ReportsPage() {
         </article>
 
         <article className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
-          <p className="text-sm text-[hsl(var(--muted-ink))]">Due Reminder Status</p>
+          <p className="text-sm text-[hsl(var(--muted-ink))]">
+            Due Reminder Status
+          </p>
           <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-[hsl(var(--muted-soft))]">
             <div className="flex h-full w-full">
-              <div style={{ width: `${dueSoonWidth}%` }} className="bg-[hsl(var(--success))]" />
-              <div style={{ width: `${dueTodayWidth}%` }} className="bg-[hsl(var(--warning))]" />
-              <div style={{ width: `${overdueWidth}%` }} className="bg-[hsl(var(--danger))]" />
+              <div
+                style={{ width: `${dueSoonWidth}%` }}
+                className="bg-[hsl(var(--success))]"
+              />
+              <div
+                style={{ width: `${dueTodayWidth}%` }}
+                className="bg-[hsl(var(--warning))]"
+              />
+              <div
+                style={{ width: `${overdueWidth}%` }}
+                className="bg-[hsl(var(--danger))]"
+              />
             </div>
           </div>
           <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
@@ -132,7 +148,9 @@ export default async function ReportsPage() {
       </section>
 
       <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
-        <p className="text-sm text-[hsl(var(--muted-ink))]">Top Services by Spend</p>
+        <p className="text-sm text-[hsl(var(--muted-ink))]">
+          Top Services by Spend
+        </p>
         <div className="mt-4 space-y-3">
           {topServices.length === 0 && (
             <p className="text-sm text-[hsl(var(--muted-ink))]">
@@ -176,13 +194,17 @@ export default async function ReportsPage() {
         {canFinancialImpact ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl bg-[hsl(var(--bg))] p-4">
-              <p className="text-xs text-[hsl(var(--muted-ink))]">Projected Annual Spend</p>
+              <p className="text-xs text-[hsl(var(--muted-ink))]">
+                Projected Annual Spend
+              </p>
               <p className="mt-1 text-2xl font-bold">
                 {formatCurrency(data.monthlySpend * 12)}
               </p>
             </div>
             <div className="rounded-xl bg-[hsl(var(--bg))] p-4">
-              <p className="text-xs text-[hsl(var(--muted-ink))]">Potential Annual Savings</p>
+              <p className="text-xs text-[hsl(var(--muted-ink))]">
+                Potential Annual Savings
+              </p>
               <p className="mt-1 text-2xl font-bold text-[hsl(var(--success))]">
                 {formatCurrency(
                   data.cheaperAlternativeOpportunities.reduce(
@@ -193,8 +215,12 @@ export default async function ReportsPage() {
               </p>
             </div>
             <div className="rounded-xl bg-[hsl(var(--bg))] p-4">
-              <p className="text-xs text-[hsl(var(--muted-ink))]">Recurring Services</p>
-              <p className="mt-1 text-2xl font-bold">{data.serviceSummary.length}</p>
+              <p className="text-xs text-[hsl(var(--muted-ink))]">
+                Recurring Services
+              </p>
+              <p className="mt-1 text-2xl font-bold">
+                {data.serviceSummary.length}
+              </p>
             </div>
           </div>
         ) : (

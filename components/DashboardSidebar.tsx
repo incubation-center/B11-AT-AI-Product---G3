@@ -31,16 +31,36 @@ type NavItem = {
   iconColor: string;
 };
 
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, iconColor: "text-blue-500" },
-  { href: "/invoices",  label: "Invoices",  icon: ReceiptText,    iconColor: "text-indigo-500", countKey: "invoices" },
-  { href: "/documents", label: "Documents", icon: Files,           iconColor: "text-violet-500", countKey: "documents" },
-  { href: "/alerts",    label: "Alerts",    icon: TriangleAlert,   iconColor: "text-amber-500",  countKey: "alerts" },
-  { href: "/services",  label: "Services",  icon: Building2,       iconColor: "text-teal-500",   countKey: "services" },
-  { href: "/calendar",  label: "Calendar",  icon: CalendarDays,    iconColor: "text-cyan-500" },
-  { href: "/reports",   label: "Reports",   icon: ChartColumn,     iconColor: "text-emerald-500" },
-  { href: "/pricing",   label: "Subscription", icon: CreditCard,  iconColor: "text-pink-500" },
-  { href: "/settings",  label: "Settings",  icon: Settings,        iconColor: "text-slate-400" },
+type NavGroup = {
+  title: string;
+  items: NavItem[];
+};
+
+const navGroups: NavGroup[] = [
+  {
+    title: "Main Menu",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, iconColor: "text-blue-500" },
+      { href: "/invoices",  label: "Invoices",  icon: ReceiptText,     iconColor: "text-indigo-500", countKey: "invoices" },
+      { href: "/documents", label: "Documents", icon: Files,            iconColor: "text-violet-500", countKey: "documents" },
+      { href: "/alerts",    label: "Alerts",    icon: TriangleAlert,    iconColor: "text-amber-500",  countKey: "alerts" },
+      { href: "/services",  label: "Services",  icon: Building2,        iconColor: "text-teal-500",   countKey: "services" },
+    ],
+  },
+  {
+    title: "Features",
+    items: [
+      { href: "/calendar",  label: "Calendar",     icon: CalendarDays, iconColor: "text-cyan-500" },
+      { href: "/reports",   label: "Reports",      icon: ChartColumn,  iconColor: "text-emerald-500" },
+      { href: "/pricing",   label: "Subscription", icon: CreditCard,   iconColor: "text-pink-500" },
+    ],
+  },
+  {
+    title: "General",
+    items: [
+      { href: "/settings", label: "Settings", icon: Settings, iconColor: "text-slate-400" },
+    ],
+  },
 ];
 
 export default function DashboardSidebar({
@@ -75,37 +95,46 @@ export default function DashboardSidebar({
         </div>
       </div>
 
-      <ul className="space-y-0.5">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const count = item.countKey ? counts[item.countKey] : null;
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={cn(
-                  "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition",
-                  "hover:bg-[hsl(var(--bg)/0.9)]",
-                  isActive
-                    ? "bg-[hsl(var(--accent-soft))] text-[hsl(var(--ink))] ring-1 ring-[hsl(var(--primary)/0.28)]"
-                    : "text-[hsl(var(--ink))] hover:text-[hsl(var(--primary))]",
-                )}
-              >
-                <span className="flex items-center gap-2.5">
-                  <Icon className={cn("h-4 w-4 shrink-0", item.iconColor)} />
-                  <span>{item.label}</span>
-                </span>
-                {typeof count === "number" && (
-                  <span className="rounded-full bg-[hsl(var(--bg))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-ink))]">
-                    {count}
-                  </span>
-                )}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="space-y-4">
+        {navGroups.map((group) => (
+          <div key={group.title}>
+            <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-[hsl(var(--muted-ink))]">
+              {group.title}
+            </p>
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const count = item.countKey ? counts[item.countKey] : null;
+                const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition",
+                        "hover:bg-[hsl(var(--bg)/0.9)]",
+                        isActive
+                          ? "bg-[hsl(var(--accent-soft))] text-[hsl(var(--ink))] ring-1 ring-[hsl(var(--primary)/0.28)]"
+                          : "text-[hsl(var(--ink))] hover:text-[hsl(var(--primary))]",
+                      )}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <Icon className={cn("h-4 w-4 shrink-0", item.iconColor)} />
+                        <span>{item.label}</span>
+                      </span>
+                      {typeof count === "number" && (
+                        <span className="rounded-full bg-[hsl(var(--bg))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-ink))]">
+                          {count}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
     </nav>
   );
 }

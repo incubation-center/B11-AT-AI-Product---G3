@@ -79,43 +79,48 @@ export async function POST(request: Request) {
 
     const userIds = Array.from(new Set(recurringBills.map((bill) => bill.userId)));
     const reminderDaysByUser = await getReminderDaysByUsers(userIds);
-    const dueReminderEmailEnabledByUser =
-      await getDueReminderEmailEnabledByUsers(userIds);
+    const dueReminderEmailEnabledByUser = await getDueReminderEmailEnabledByUsers(userIds);
     const existingDeliveryKeys = await getExistingDeliveryKeys();
 
     const candidates: ReminderCandidate[] = [];
+
     for (const bill of recurringBills) {
       if (!bill.dueDate) continue;
       if (dueReminderEmailEnabledByUser.get(bill.userId) === false) continue;
-      const reminderDays = reminderDaysByUser.get(bill.userId) ?? 7;
+
+      const reminderDaysArr = reminderDaysByUser.get(bill.userId) ?? [7];
       const daysUntilDue = calcDaysUntilDue(bill.dueDate, now);
       if (daysUntilDue === null) continue;
-      if (daysUntilDue < 0 || daysUntilDue > reminderDays) continue;
 
       const dueDate = new Date(bill.dueDate);
-      const reminderDate = new Date(
-        toStartOfDay(dueDate).getTime() - reminderDays * DAY_MS,
-      )
-        .toISOString()
-        .slice(0, 10);
 
-      const dedupeKey = toReminderDeliveryKey({
-        userId: bill.userId,
-        billId: bill.id,
-        dueDate: bill.dueDate,
-        reminderDate,
-      });
-      if (existingDeliveryKeys.has(dedupeKey)) continue;
+      for (const reminderDay of reminderDaysArr) {
+        if (daysUntilDue < 0 || daysUntilDue > reminderDay) continue;
 
-      candidates.push({
-        billId: bill.id,
-        userId: bill.userId,
-        serviceName: bill.serviceName,
-        dueDate: bill.dueDate,
-        amount: bill.amount,
-        daysUntilDue,
-        reminderDate,
-      });
+        const reminderDate = new Date(
+          toStartOfDay(dueDate).getTime() - reminderDay * DAY_MS,
+        )
+          .toISOString()
+          .slice(0, 10);
+
+        const dedupeKey = toReminderDeliveryKey({
+          userId: bill.userId,
+          billId: bill.id,
+          dueDate: bill.dueDate,
+          reminderDate,
+        });
+        if (existingDeliveryKeys.has(dedupeKey)) continue;
+
+        candidates.push({
+          billId: bill.id,
+          userId: bill.userId,
+          serviceName: bill.serviceName,
+          dueDate: bill.dueDate,
+          amount: bill.amount,
+          daysUntilDue,
+          reminderDate,
+        });
+      }
     }
 
     if (candidates.length === 0) {

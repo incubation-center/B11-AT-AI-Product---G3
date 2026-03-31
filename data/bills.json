@@ -399,7 +399,7 @@
       "classificationConfidence": 1,
       "sourceDocumentId": null,
       "createdAt": "2026-03-23T14:41:40.752Z",
-      "recurrenceStatus": "active"
+      "recurrenceStatus": "stopped"
     },
     {
       "id": "f171c8e4-a2c3-4ec2-ae3f-f3c815afed8a",
@@ -479,6 +479,85 @@
       "classificationConfidence": 1,
       "sourceDocumentId": "6110f986-e0de-458a-b150-7c78d6a9251b",
       "createdAt": "2026-03-25T16:29:59.210Z",
+      "recurrenceStatus": "active"
+    },
+    {
+      "id": "445e1ade-f8f0-4d1d-93d0-ab5bbdfcfa97",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "Spotify",
+      "billDate": "2026-03-19",
+      "dueDate": "2026-04-19",
+      "amount": 10.99,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "classificationReason": "The document contains evidence of a monthly billing cycle with auto-renewal language.",
+      "classificationEvidence": [
+        "Billing cycle Monthly · Auto-renews Apr 19",
+        "Member since January 14, 2021"
+      ],
+      "classificationConfidence": 1,
+      "sourceDocumentId": "e739ef08-96ff-4450-9572-8c141e066f86",
+      "createdAt": "2026-03-30T16:32:07.729Z",
+      "recurrenceStatus": "active"
+    },
+    {
+      "id": "243dfcd8-0c08-4cfc-9693-31607d294bcd",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "null",
+      "billDate": "2023-10-25",
+      "dueDate": null,
+      "amount": 25.25,
+      "usage": null,
+      "isRecurring": false,
+      "invoiceType": "one_time",
+      "classificationReason": "The document does not contain evidence of an ongoing billing cycle.",
+      "classificationEvidence": [
+        "Thank You For Your Purchase!"
+      ],
+      "classificationConfidence": 1,
+      "sourceDocumentId": "37135893-5d20-4958-87c0-7ae29daba0a3",
+      "createdAt": "2026-03-30T16:32:36.374Z",
+      "recurrenceStatus": "active"
+    },
+    {
+      "id": "86d6fb55-d810-4106-ae1d-5bdff8c82fd0",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "Spotify",
+      "billDate": "2026-03-19",
+      "dueDate": "2026-04-19",
+      "amount": 10.99,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "classificationReason": "The document contains evidence of a monthly billing cycle with auto-renewal language.",
+      "classificationEvidence": [
+        "Billing cycle Monthly · Auto-renews Apr 19",
+        "Member since January 14, 2021",
+        "Invoice No. SPT-2026-03847"
+      ],
+      "classificationConfidence": 1,
+      "sourceDocumentId": "d40d5b96-9bb2-44db-a8d4-2589b7ca5986",
+      "createdAt": "2026-03-30T16:43:06.486Z",
+      "recurrenceStatus": "active"
+    },
+    {
+      "id": "10fc2fdc-c126-4514-9e7b-86d4da270e74",
+      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
+      "serviceName": "Amazon Prime",
+      "billDate": "2026-03-30",
+      "dueDate": "2026-04-01",
+      "amount": 25.99,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "classificationReason": "Manually added via /api/add",
+      "classificationEvidence": [
+        "manual_entry"
+      ],
+      "classificationConfidence": 1,
+      "sourceDocumentId": null,
+      "createdAt": "2026-03-30T16:57:22.922Z",
       "recurrenceStatus": "active"
     }
   ]

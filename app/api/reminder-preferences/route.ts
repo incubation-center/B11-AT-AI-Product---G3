@@ -8,9 +8,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-async function resolveUserId(
-  bodyUserId?: string,
-): Promise<string | null> {
+async function resolveUserId(bodyUserId?: string): Promise<string | null> {
   if (bodyUserId) return bodyUserId;
   const hdrs = await headers();
   const headerUserId = hdrs.get("x-user-id");
@@ -25,8 +23,8 @@ export async function GET() {
     if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
-    const daysBeforeDue = await getReminderDaysForUser(userId);
-    return NextResponse.json({ days_before_due: daysBeforeDue });
+    const reminderDays = await getReminderDaysForUser(userId);
+    return NextResponse.json({ reminder_days: reminderDays });
   } catch (error) {
     return NextResponse.json(
       {
@@ -42,7 +40,7 @@ export async function PUT(request: Request) {
   try {
     const body = (await request.json()) as {
       user_id?: string;
-      days_before_due?: number;
+      reminder_days?: number[];
     };
 
     const userId = await resolveUserId(body.user_id);
@@ -50,19 +48,15 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    if (typeof body.days_before_due !== "number") {
+    if (!Array.isArray(body.reminder_days)) {
       return NextResponse.json(
-        { error: "days_before_due must be a number" },
+        { error: "reminder_days must be an array of numbers" },
         { status: 400 },
       );
     }
 
-    const daysBeforeDue = await setReminderDaysForUser(
-      userId,
-      body.days_before_due,
-    );
-
-    return NextResponse.json({ days_before_due: daysBeforeDue });
+    const reminderDays = await setReminderDaysForUser(userId, body.reminder_days);
+    return NextResponse.json({ reminder_days: reminderDays });
   } catch (error) {
     return NextResponse.json(
       {

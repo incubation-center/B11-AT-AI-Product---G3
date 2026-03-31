@@ -93,7 +93,7 @@ export default async function DashboardPage() {
       )}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-2xl border-l-4 border-l-[hsl(var(--primary))] border-y border-r border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
+        <article className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="text-sm text-[hsl(var(--muted-ink))]">Invoices</h3>
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--accent-soft))]">
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
           </div>
           <p className="mt-2 text-3xl font-bold">{data.userBills.length}</p>
         </article>
-        <article className="rounded-2xl border-l-4 border-l-[hsl(var(--chart-1))] border-y border-r border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
+        <article className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="text-sm text-[hsl(var(--muted-ink))]">Recurring</h3>
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--chart-soft))]">
@@ -111,7 +111,7 @@ export default async function DashboardPage() {
           </div>
           <p className="mt-2 text-3xl font-bold">{data.recurringBills.length}</p>
         </article>
-        <article className="rounded-2xl border-l-4 border-l-[hsl(var(--warning))] border-y border-r border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
+        <article className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="text-sm text-[hsl(var(--muted-ink))]">Alerts</h3>
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--warning-soft))]">
@@ -120,7 +120,7 @@ export default async function DashboardPage() {
           </div>
           <p className="mt-2 text-3xl font-bold">{data.sidebarCounts.alerts}</p>
         </article>
-        <article className="rounded-2xl border-l-4 border-l-[hsl(var(--success))] border-y border-r border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
+        <article className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="text-sm text-[hsl(var(--muted-ink))]">This Month Spend</h3>
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--success-soft))]">
