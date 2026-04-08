@@ -1,92 +1,9 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
+import { eq, lt } from "drizzle-orm";
 import { randomBytes } from "crypto";
+import { db } from "@/db/drizzle";
+import { telegramLinksTable, telegramPendingTokensTable } from "@/db/schema/tableSchema";
 
-type TelegramLinkRecord = {
-  userId: string;
-  telegramUserId: string;
-  chatId: string;
-  username: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  linkedAt: string;
-  updatedAt: string;
-};
-
-type PendingTelegramLinkToken = {
-  token: string;
-  userId: string;
-  expiresAt: string;
-  createdAt: string;
-};
-
-type TelegramLinkStore = {
-  links: TelegramLinkRecord[];
-  pendingTokens: PendingTelegramLinkToken[];
-};
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const TELEGRAM_LINK_PATH = path.join(DATA_DIR, "telegram-links.json");
 const DEFAULT_TOKEN_TTL_MINUTES = 10;
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-function isExpired(iso: string): boolean {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return true;
-  return date.getTime() <= Date.now();
-}
-
-function sanitizeStore(input: unknown): TelegramLinkStore {
-  const fallback: TelegramLinkStore = { links: [], pendingTokens: [] };
-  if (!input || typeof input !== "object") return fallback;
-
-  const obj = input as Partial<TelegramLinkStore>;
-  const links = Array.isArray(obj.links) ? obj.links : [];
-  const pendingTokens = Array.isArray(obj.pendingTokens) ? obj.pendingTokens : [];
-
-  return {
-    links: links.filter(
-      (item): item is TelegramLinkRecord =>
-        !!item &&
-        typeof item.userId === "string" &&
-        typeof item.telegramUserId === "string" &&
-        typeof item.chatId === "string" &&
-        typeof item.linkedAt === "string" &&
-        typeof item.updatedAt === "string",
-    ),
-    pendingTokens: pendingTokens.filter(
-      (item): item is PendingTelegramLinkToken =>
-        !!item &&
-        typeof item.token === "string" &&
-        typeof item.userId === "string" &&
-        typeof item.expiresAt === "string" &&
-        typeof item.createdAt === "string",
-    ),
-  };
-}
-
-async function ensureStore(): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
-  try {
-    await readFile(TELEGRAM_LINK_PATH, "utf8");
-  } catch {
-    const init: TelegramLinkStore = { links: [], pendingTokens: [] };
-    await writeFile(TELEGRAM_LINK_PATH, JSON.stringify(init, null, 2), "utf8");
-  }
-}
-
-async function readStore(): Promise<TelegramLinkStore> {
-  await ensureStore();
-  const raw = await readFile(TELEGRAM_LINK_PATH, "utf8");
-  return sanitizeStore(JSON.parse(raw));
-}
-
-async function writeStore(store: TelegramLinkStore): Promise<void> {
-  await writeFile(TELEGRAM_LINK_PATH, JSON.stringify(store, null, 2), "utf8");
-}
 
 function newToken(): string {
   return randomBytes(24).toString("base64url");
@@ -100,23 +17,21 @@ export async function createTelegramLinkToken(
   if (!safeUserId) throw new Error("user_id_required");
 
   const safeTtl = Math.max(1, Math.min(60, Math.round(ttlMinutes)));
-  const createdAt = new Date();
-  const expiresAt = new Date(createdAt.getTime() + safeTtl * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + safeTtl * 60 * 1000);
   const token = newToken();
 
-  const store = await readStore();
-  store.pendingTokens = store.pendingTokens.filter(
-    (item) => item.userId !== safeUserId && !isExpired(item.expiresAt),
-  );
-  store.pendingTokens.push({
+  // Remove any existing pending tokens for this user
+  await db
+    .delete(telegramPendingTokensTable)
+    .where(eq(telegramPendingTokensTable.userId, safeUserId));
+
+  await db.insert(telegramPendingTokensTable).values({
     token,
     userId: safeUserId,
     expiresAt,
-    createdAt: createdAt.toISOString(),
   });
-  await writeStore(store);
 
-  return { token, expiresAt };
+  return { token, expiresAt: expiresAt.toISOString() };
 }
 
 export async function consumeTelegramLinkToken(
@@ -125,18 +40,26 @@ export async function consumeTelegramLinkToken(
   const safeToken = token.trim();
   if (!safeToken) return { ok: false, reason: "token_required" };
 
-  const store = await readStore();
-  store.pendingTokens = store.pendingTokens.filter((item) => !isExpired(item.expiresAt));
+  // Clean up expired tokens
+  await db
+    .delete(telegramPendingTokensTable)
+    .where(lt(telegramPendingTokensTable.expiresAt, new Date()));
 
-  const matchIndex = store.pendingTokens.findIndex((item) => item.token === safeToken);
-  if (matchIndex < 0) {
-    await writeStore(store);
+  const rows = await db
+    .select()
+    .from(telegramPendingTokensTable)
+    .where(eq(telegramPendingTokensTable.token, safeToken))
+    .limit(1);
+
+  if (rows.length === 0) {
     return { ok: false, reason: "invalid_or_expired_token" };
   }
 
-  const match = store.pendingTokens[matchIndex];
-  store.pendingTokens.splice(matchIndex, 1);
-  await writeStore(store);
+  const match = rows[0];
+  await db
+    .delete(telegramPendingTokensTable)
+    .where(eq(telegramPendingTokensTable.id, match.id));
+
   return { ok: true, userId: match.userId };
 }
 
@@ -147,7 +70,7 @@ export async function upsertTelegramLink(params: {
   username?: string | null;
   firstName?: string | null;
   lastName?: string | null;
-}): Promise<TelegramLinkRecord> {
+}) {
   const userId = params.userId.trim();
   const telegramUserId = params.telegramUserId.trim();
   const chatId = params.chatId.trim();
@@ -156,53 +79,57 @@ export async function upsertTelegramLink(params: {
   if (!telegramUserId) throw new Error("telegram_user_id_required");
   if (!chatId) throw new Error("chat_id_required");
 
-  const store = await readStore();
-  const existingIndex = store.links.findIndex(
-    (item) => item.userId === userId || item.telegramUserId === telegramUserId,
-  );
+  await db
+    .insert(telegramLinksTable)
+    .values({
+      userId,
+      telegramUserId,
+      chatId,
+      username: params.username?.trim() ?? null,
+      firstName: params.firstName?.trim() ?? null,
+      lastName: params.lastName?.trim() ?? null,
+    })
+    .onConflictDoUpdate({
+      target: telegramLinksTable.userId,
+      set: {
+        telegramUserId,
+        chatId,
+        username: params.username?.trim() ?? null,
+        firstName: params.firstName?.trim() ?? null,
+        lastName: params.lastName?.trim() ?? null,
+        updatedAt: new Date(),
+      },
+    });
 
-  const timestamp = nowIso();
-  const existing = existingIndex >= 0 ? store.links[existingIndex] : null;
+  const rows = await db
+    .select()
+    .from(telegramLinksTable)
+    .where(eq(telegramLinksTable.userId, userId))
+    .limit(1);
 
-  const payload: TelegramLinkRecord = {
-    userId,
-    telegramUserId,
-    chatId,
-    username: params.username?.trim() || null,
-    firstName: params.firstName?.trim() || null,
-    lastName: params.lastName?.trim() || null,
-    linkedAt: existing?.linkedAt ?? timestamp,
-    updatedAt: timestamp,
-  };
-
-  if (existingIndex >= 0) {
-    store.links[existingIndex] = payload;
-  } else {
-    store.links.push(payload);
-  }
-
-  await writeStore(store);
-  return payload;
+  return rows[0];
 }
 
-export async function getTelegramLinkByUserId(
-  userId: string,
-): Promise<TelegramLinkRecord | null> {
+export async function getTelegramLinkByUserId(userId: string) {
   const safeUserId = userId.trim();
   if (!safeUserId) return null;
-  const store = await readStore();
-  return store.links.find((item) => item.userId === safeUserId) ?? null;
+  const rows = await db
+    .select()
+    .from(telegramLinksTable)
+    .where(eq(telegramLinksTable.userId, safeUserId))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
-export async function getTelegramLinkByTelegramUserId(
-  telegramUserId: string,
-): Promise<TelegramLinkRecord | null> {
+export async function getTelegramLinkByTelegramUserId(telegramUserId: string) {
   const safeTelegramUserId = telegramUserId.trim();
   if (!safeTelegramUserId) return null;
-  const store = await readStore();
-  return (
-    store.links.find((item) => item.telegramUserId === safeTelegramUserId) ?? null
-  );
+  const rows = await db
+    .select()
+    .from(telegramLinksTable)
+    .where(eq(telegramLinksTable.telegramUserId, safeTelegramUserId))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export async function resolveUserIdFromTelegram(params: {
@@ -213,15 +140,23 @@ export async function resolveUserIdFromTelegram(params: {
   const safeChatId = params.chatId?.trim() || null;
   if (!safeTelegramUserId && !safeChatId) return null;
 
-  const store = await readStore();
-  const byTelegramUser =
-    safeTelegramUserId
-      ? store.links.find((item) => item.telegramUserId === safeTelegramUserId)
-      : null;
-  if (byTelegramUser) return byTelegramUser.userId;
+  if (safeTelegramUserId) {
+    const rows = await db
+      .select()
+      .from(telegramLinksTable)
+      .where(eq(telegramLinksTable.telegramUserId, safeTelegramUserId))
+      .limit(1);
+    if (rows[0]) return rows[0].userId;
+  }
 
-  if (!safeChatId) return null;
-  const byChat = store.links.find((item) => item.chatId === safeChatId);
-  return byChat?.userId ?? null;
+  if (safeChatId) {
+    const rows = await db
+      .select()
+      .from(telegramLinksTable)
+      .where(eq(telegramLinksTable.chatId, safeChatId))
+      .limit(1);
+    if (rows[0]) return rows[0].userId;
+  }
+
+  return null;
 }
-

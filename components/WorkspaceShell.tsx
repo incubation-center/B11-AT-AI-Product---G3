@@ -1,5 +1,4 @@
 import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardUserMenu from "@/components/DashboardUserMenu";
 import { ModeToggle } from "@/components/mode-toggle";
 
 type SidebarCounts = {
@@ -31,16 +30,16 @@ export default function WorkspaceShell({
 
         <div className="p-4 md:p-8 lg:ml-68">
           <div className="space-y-6">
-            <div className="rounded-3xl border border-[hsl(var(--primary))] bg-[hsl(var(--primary))] p-6 shadow-sm">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold text-white md:text-4xl">{title}</h1>
-                  <p className="mt-2 text-white/85">{description}</p>
+            <div className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] px-5 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-1 rounded-full bg-[hsl(var(--primary))]" />
+                  <div>
+                    <h1 className="text-xl font-bold text-[hsl(var(--ink))]">{title}</h1>
+                    <p className="text-xs text-[hsl(var(--muted-ink))]">{description}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <ModeToggle />
-                  <DashboardUserMenu name={userName} />
-                </div>
+                <ModeToggle />
               </div>
             </div>
 

@@ -117,6 +117,7 @@ export async function POST(request: Request) {
       classificationReason: "Manually added via /api/add",
       classificationEvidence: ["manual_entry"],
       classificationConfidence: 1,
+      recurrenceStatus: "active" as const,
       sourceDocumentId: null,
       createdAt: new Date().toISOString(),
     };

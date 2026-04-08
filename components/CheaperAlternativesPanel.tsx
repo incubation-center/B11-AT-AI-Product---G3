@@ -166,14 +166,15 @@ export default function CheaperAlternativesPanel({
 
   return (
     <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
-      <div className="flex flex-col gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-white">AI Cheaper Alternatives</h2>
-          <p className="mt-1 text-sm text-white/85">
-            Fast suggestions with pricing, savings, and confidence.
-          </p>
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="h-6 w-1 rounded-full bg-[hsl(var(--primary))]" />
+          <div>
+            <h2 className="text-base font-semibold text-[hsl(var(--ink))]">AI Cheaper Alternatives</h2>
+            <p className="text-xs text-[hsl(var(--muted-ink))]">Fast suggestions with pricing, savings, and confidence.</p>
+          </div>
         </div>
-        <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[hsl(var(--primary))]">
+        <span className="rounded-full border border-[hsl(var(--line))] px-3 py-1 text-xs font-semibold text-[hsl(var(--primary))]">
           {opportunities.length} opportunities
         </span>
       </div>

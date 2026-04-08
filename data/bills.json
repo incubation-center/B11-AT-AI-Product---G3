@@ -192,7 +192,7 @@
       "userId": "demo-user",
       "serviceName": "Microsoft",
       "billDate": "2023-08-07",
-      "dueDate": "2026-04-06",
+      "dueDate": "2026-05-06",
       "amount": 26.43,
       "usage": null,
       "isRecurring": true,
@@ -247,7 +247,7 @@
       "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
       "serviceName": "FlowSync",
       "billDate": "2026-03-19",
-      "dueDate": "2026-04-05",
+      "dueDate": "2026-05-05",
       "amount": 420.98,
       "usage": null,
       "isRecurring": true,
@@ -321,14 +321,14 @@
       "classificationConfidence": 1,
       "sourceDocumentId": "bfc2a6d6-c849-4c03-af12-7c9dfb89da31",
       "createdAt": "2026-03-21T04:10:47.912Z",
-      "recurrenceStatus": "active"
+      "recurrenceStatus": "stopped"
     },
     {
       "id": "af629efa-dca5-4f1a-88da-6d0dd2d86567",
       "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
       "serviceName": "Netflix",
       "billDate": "2026-02-28",
-      "dueDate": "2026-04-01",
+      "dueDate": "2026-05-01",
       "amount": 22.99,
       "usage": null,
       "isRecurring": true,
@@ -348,7 +348,7 @@
       "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
       "serviceName": "Netflix",
       "billDate": "2026-02-28",
-      "dueDate": "2026-04-01",
+      "dueDate": "2026-05-01",
       "amount": 22.99,
       "usage": null,
       "isRecurring": true,
@@ -368,7 +368,7 @@
       "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
       "serviceName": "Netflix",
       "billDate": "2026-03-23",
-      "dueDate": "2026-04-01",
+      "dueDate": "2026-05-01",
       "amount": 22.99,
       "usage": null,
       "isRecurring": true,
@@ -442,30 +442,11 @@
       "recurrenceStatus": "active"
     },
     {
-      "id": "6d77afec-6b5a-4383-a966-2528a0d63b46",
-      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
-      "serviceName": "null",
-      "billDate": "2025-12-06",
-      "dueDate": null,
-      "amount": 8.7,
-      "usage": null,
-      "isRecurring": false,
-      "invoiceType": "one_time",
-      "classificationReason": "The document does not contain evidence of an ongoing billing cycle.",
-      "classificationEvidence": [
-        "Thank you for your visit! Come back soon for more cozy moments and great coffee."
-      ],
-      "classificationConfidence": 1,
-      "sourceDocumentId": "fdd4f334-2cb5-42d2-8fe3-c46aef882dad",
-      "createdAt": "2026-03-25T16:25:07.011Z",
-      "recurrenceStatus": "active"
-    },
-    {
       "id": "e1f5d612-1470-4a3c-84fd-686e2c4f83a8",
       "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
       "serviceName": "Spotify",
       "billDate": "2026-03-25",
-      "dueDate": "2026-04-08",
+      "dueDate": "2026-05-08",
       "amount": 11.99,
       "usage": null,
       "isRecurring": true,
@@ -521,32 +502,11 @@
       "recurrenceStatus": "active"
     },
     {
-      "id": "86d6fb55-d810-4106-ae1d-5bdff8c82fd0",
-      "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
-      "serviceName": "Spotify",
-      "billDate": "2026-03-19",
-      "dueDate": "2026-04-19",
-      "amount": 10.99,
-      "usage": null,
-      "isRecurring": true,
-      "invoiceType": "recurring",
-      "classificationReason": "The document contains evidence of a monthly billing cycle with auto-renewal language.",
-      "classificationEvidence": [
-        "Billing cycle Monthly · Auto-renews Apr 19",
-        "Member since January 14, 2021",
-        "Invoice No. SPT-2026-03847"
-      ],
-      "classificationConfidence": 1,
-      "sourceDocumentId": "d40d5b96-9bb2-44db-a8d4-2589b7ca5986",
-      "createdAt": "2026-03-30T16:43:06.486Z",
-      "recurrenceStatus": "active"
-    },
-    {
       "id": "10fc2fdc-c126-4514-9e7b-86d4da270e74",
       "userId": "4AlIJFAMSfOYSCSdeekBMQUR3kFaDV16",
       "serviceName": "Amazon Prime",
       "billDate": "2026-03-30",
-      "dueDate": "2026-04-01",
+      "dueDate": "2026-05-01",
       "amount": 25.99,
       "usage": null,
       "isRecurring": true,
@@ -558,7 +518,7 @@
       "classificationConfidence": 1,
       "sourceDocumentId": null,
       "createdAt": "2026-03-30T16:57:22.922Z",
-      "recurrenceStatus": "active"
+      "recurrenceStatus": "stopped"
     }
   ]
 }

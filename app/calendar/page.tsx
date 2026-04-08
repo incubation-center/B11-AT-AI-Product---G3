@@ -19,7 +19,7 @@ export default async function CalendarPage() {
       <BillingCalendar
         bills={billsWithDueDates}
         dueReminders={data.dueReminders}
-        reminderDaysBeforeDue={data.reminderDaysBeforeDue}
+        reminderDaysBeforeDue={data.reminderDaysBeforeDue[0] ?? 7}
       />
     </WorkspaceShell>
   );

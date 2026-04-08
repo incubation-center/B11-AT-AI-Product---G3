@@ -16,9 +16,9 @@
   --danger: 0 77% 52%;
   --danger-soft: 0 88% 94%;
   --muted-soft: 207 42% 92%;
-  --chart-1: 188 72% 42%;
-  --chart-2: 166 64% 42%;
-  --chart-soft: 188 80% 93%;
+  --chart-1: 211 74% 42%;
+  --chart-2: 250 60% 58%;
+  --chart-soft: 211 85% 94%;
 
   --background: hsl(var(--bg));
   --foreground: hsl(var(--ink));
@@ -36,7 +36,7 @@
   --ink: 0 0% 96%;
   --muted-ink: 214 18% 72%;
   --line: 217 22% 23%;
-  --primary: 210 82% 68%;
+  --primary: 211 74% 42%;
   --accent: 201 88% 72%;
   --accent-soft: 210 38% 23%;
   --success: 144 66% 56%;
@@ -46,9 +46,9 @@
   --danger: 0 89% 67%;
   --danger-soft: 0 51% 25%;
   --muted-soft: 217 23% 20%;
-  --chart-1: 188 72% 62%;
-  --chart-2: 166 64% 60%;
-  --chart-soft: 188 34% 22%;
+  --chart-1: 211 74% 58%;
+  --chart-2: 250 60% 68%;
+  --chart-soft: 211 38% 22%;
 
   --background: hsl(var(--bg));
   --foreground: hsl(var(--ink));

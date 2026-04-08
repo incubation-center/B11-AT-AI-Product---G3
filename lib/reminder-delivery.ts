@@ -1,7 +1,8 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
+import { eq } from "drizzle-orm";
+import { db } from "@/db/drizzle";
+import { reminderDeliveryLogsTable } from "@/db/schema/tableSchema";
 
-type ReminderDeliveryRecord = {
+export type ReminderDeliveryHistoryItem = {
   id: string;
   userId: string;
   billId: string;
@@ -10,13 +11,6 @@ type ReminderDeliveryRecord = {
   email: string;
   sentAt: string;
 };
-
-type ReminderDeliveryStore = {
-  records: ReminderDeliveryRecord[];
-};
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const REMINDER_DELIVERY_PATH = path.join(DATA_DIR, "reminder-delivery-log.json");
 
 function makeDeliveryKey(params: {
   userId: string;
@@ -32,40 +26,26 @@ function makeDeliveryKey(params: {
   ].join("::");
 }
 
-async function ensureStore(): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
-  try {
-    await readFile(REMINDER_DELIVERY_PATH, "utf8");
-  } catch {
-    await writeFile(
-      REMINDER_DELIVERY_PATH,
-      JSON.stringify({ records: [] }, null, 2),
-      "utf8",
-    );
-  }
-}
-
-async function readStore(): Promise<ReminderDeliveryStore> {
-  await ensureStore();
-  const raw = await readFile(REMINDER_DELIVERY_PATH, "utf8");
-  return JSON.parse(raw) as ReminderDeliveryStore;
-}
-
-async function writeStore(store: ReminderDeliveryStore): Promise<void> {
-  await writeFile(REMINDER_DELIVERY_PATH, JSON.stringify(store, null, 2), "utf8");
+export function toReminderDeliveryKey(params: {
+  userId: string;
+  billId: string;
+  dueDate: string;
+  reminderDate: string;
+}): string {
+  return makeDeliveryKey(params);
 }
 
 export async function getExistingDeliveryKeys(): Promise<Set<string>> {
-  const store = await readStore();
-  const keys = store.records.map((record) =>
-    makeDeliveryKey({
-      userId: record.userId,
-      billId: record.billId,
-      dueDate: record.dueDate,
-      reminderDate: record.reminderDate,
-    }),
-  );
-  return new Set(keys);
+  const rows = await db
+    .select({
+      userId: reminderDeliveryLogsTable.userId,
+      billId: reminderDeliveryLogsTable.billId,
+      dueDate: reminderDeliveryLogsTable.dueDate,
+      reminderDate: reminderDeliveryLogsTable.reminderDate,
+    })
+    .from(reminderDeliveryLogsTable);
+
+  return new Set(rows.map((r) => makeDeliveryKey(r)));
 }
 
 export async function appendReminderDeliveryRecords(
@@ -79,47 +59,41 @@ export async function appendReminderDeliveryRecords(
 ): Promise<void> {
   if (input.length === 0) return;
 
-  const store = await readStore();
-  const now = new Date().toISOString();
-
-  for (const item of input) {
-    store.records.push({
-      id: crypto.randomUUID(),
+  await db.insert(reminderDeliveryLogsTable).values(
+    input.map((item) => ({
       userId: item.userId,
       billId: item.billId,
       dueDate: item.dueDate,
       reminderDate: item.reminderDate,
       email: item.email,
-      sentAt: now,
-    });
-  }
-
-  await writeStore(store);
+    })),
+  );
 }
-
-export function toReminderDeliveryKey(params: {
-  userId: string;
-  billId: string;
-  dueDate: string;
-  reminderDate: string;
-}): string {
-  return makeDeliveryKey(params);
-}
-
-export type ReminderDeliveryHistoryItem = ReminderDeliveryRecord;
 
 export async function getReminderDeliveryHistoryForUser(params: {
   userId: string;
   limit?: number;
 }): Promise<ReminderDeliveryHistoryItem[]> {
-  const store = await readStore();
   const safeLimit =
     typeof params.limit === "number" && params.limit > 0
       ? Math.floor(params.limit)
       : 20;
 
-  return store.records
-    .filter((record) => record.userId === params.userId)
-    .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
-    .slice(0, safeLimit);
+  const rows = await db
+    .select()
+    .from(reminderDeliveryLogsTable)
+    .where(eq(reminderDeliveryLogsTable.userId, params.userId))
+    .limit(safeLimit);
+
+  return rows
+    .map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      billId: r.billId,
+      dueDate: r.dueDate,
+      reminderDate: r.reminderDate,
+      email: r.email,
+      sentAt: r.sentAt.toISOString(),
+    }))
+    .sort((a, b) => b.sentAt.localeCompare(a.sentAt));
 }

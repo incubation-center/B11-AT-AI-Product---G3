@@ -151,6 +151,7 @@ export async function POST(request: Request) {
           typeof body.current_usage === "number" ? body.current_usage : null,
         isRecurring: invoiceType === "recurring",
         invoiceType,
+        recurrenceStatus: "active" as const,
         classificationReason: null,
         classificationEvidence: [],
         classificationConfidence: null,

@@ -298,6 +298,57 @@ import { user } from "./users";
   }));
   
   
+  export const telegramLinksTable = pgTable(
+    "telegram_links",
+    {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: text("user_id").notNull().unique().references(() => user.id, { onDelete: "cascade" }),
+      telegramUserId: varchar("telegram_user_id", { length: 50 }).notNull().unique(),
+      chatId: varchar("chat_id", { length: 50 }).notNull(),
+      username: varchar("username", { length: 100 }),
+      firstName: varchar("first_name", { length: 100 }),
+      lastName: varchar("last_name", { length: 100 }),
+      linkedAt: timestamp("linked_at").notNull().defaultNow(),
+      updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+    },
+    (table) => ({
+      userIdIdx: index("telegram_links_user_id_idx").on(table.userId),
+      telegramUserIdIdx: index("telegram_links_telegram_user_id_idx").on(table.telegramUserId),
+    }),
+  );
+
+  export const telegramPendingTokensTable = pgTable(
+    "telegram_pending_tokens",
+    {
+      id: uuid("id").primaryKey().defaultRandom(),
+      token: varchar("token", { length: 100 }).notNull().unique(),
+      userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+      expiresAt: timestamp("expires_at").notNull(),
+      createdAt: timestamp("created_at").notNull().defaultNow(),
+    },
+    (table) => ({
+      tokenIdx: index("telegram_pending_tokens_token_idx").on(table.token),
+      userIdIdx: index("telegram_pending_tokens_user_id_idx").on(table.userId),
+    }),
+  );
+
+  export const reminderDeliveryLogsTable = pgTable(
+    "reminder_delivery_logs",
+    {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+      billId: text("bill_id").notNull(),
+      dueDate: varchar("due_date", { length: 20 }).notNull(),
+      reminderDate: varchar("reminder_date", { length: 20 }).notNull(),
+      email: text("email").notNull(),
+      sentAt: timestamp("sent_at").notNull().defaultNow(),
+    },
+    (table) => ({
+      userIdIdx: index("reminder_delivery_logs_user_id_idx").on(table.userId),
+      dedupeIdx: index("reminder_delivery_logs_dedupe_idx").on(table.userId, table.billId, table.dueDate, table.reminderDate),
+    }),
+  );
+
   // Users
   export type InsertUser = typeof user.$inferInsert;
   export type SelectUser = typeof user.$inferSelect;

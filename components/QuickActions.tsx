@@ -158,6 +158,11 @@ function UploadModal({
             "Failed to upload document",
         );
       }
+      if (ingestData.status === "skipped") {
+        setErrorMsg(ingestData.message ?? "This document was not recognized as an invoice or contract and was not saved.");
+        setStatus("idle");
+        return;
+      }
       const result = ingestData as UploadResult;
       setUploadResult(result);
       setDetectedDocType(result.doc_type);
@@ -321,6 +326,7 @@ function UploadModal({
               {/* Submit */}
               <Button
                 type="submit"
+                variant="outline"
                 disabled={!file || isLoading}
                 className="w-full"
               >
@@ -385,11 +391,11 @@ function DoneView({
   return (
     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
       {/* Success banner */}
-      <div className="flex items-start gap-3 rounded-xl bg-emerald-500/10 px-4 py-3">
-        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
+      <div className={`flex items-start gap-3 rounded-xl px-4 py-3 ${docType === "bill" && !uploadResult.bill_record ? "bg-amber-500/10" : "bg-emerald-500/10"}`}>
+        <CheckCircle2 className={`mt-0.5 h-5 w-5 shrink-0 ${docType === "bill" && !uploadResult.bill_record ? "text-amber-500" : "text-emerald-500"}`} />
         <div>
           <p className="font-medium text-sm">
-            {typeLabel} uploaded successfully
+            {docType === "bill" && !uploadResult.bill_record ? "Document indexed — not recognized as an invoice" : `${typeLabel} uploaded successfully`}
           </p>
           <p className="text-xs text-[hsl(var(--muted-ink))] mt-0.5">
             Detected as <span className="font-semibold">{typeLabel}</span> ·{" "}
@@ -476,11 +482,10 @@ function DoneView({
 
       {/* No billing info found */}
       {docType === "bill" && !uploadResult.bill_record && (
-        <div className="rounded-xl border border-dashed border-[hsl(var(--line))] p-4">
-          <p className="text-sm font-medium">No payment amount found</p>
+        <div className="rounded-xl border border-amber-400 bg-amber-500/10 p-4">
+          <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">⚠ This does not appear to be an invoice</p>
           <p className="text-xs text-[hsl(var(--muted-ink))] mt-1">
-            The document was indexed and is searchable, but no invoice amount or
-            due date could be extracted. This may be an informational document.
+            No payment amount or due date was found. The document has been saved and is searchable, but it will not appear in your invoices or reminders.
           </p>
         </div>
       )}
@@ -628,7 +633,7 @@ function DoneView({
         <Button variant="outline" className="flex-1" onClick={onUploadAnother}>
           Upload Another
         </Button>
-        <Button className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1" onClick={onClose}>
           Done
         </Button>
       </div>

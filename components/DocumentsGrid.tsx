@@ -116,12 +116,10 @@ export default function DocumentsGrid({
 
   if (documents.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-14 text-[hsl(var(--muted-ink))]">
-        <ClipboardList className="h-12 w-12 opacity-30 mb-3" />
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--line))] py-14 text-[hsl(var(--muted-ink))]">
+        <ClipboardList className="mb-3 h-10 w-10 opacity-30" />
         <p className="text-sm font-medium">No documents yet</p>
-        <p className="text-xs mt-1 opacity-70">
-          Upload a bill or contract using Quick Actions above.
-        </p>
+        <p className="mt-1 text-xs opacity-70">Upload a bill or contract above.</p>
       </div>
     );
   }
@@ -138,7 +136,7 @@ export default function DocumentsGrid({
 
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] divide-y divide-[hsl(var(--line))]">
         {paged.map((doc) => {
           const bill = billByDocId.get(doc.id);
           const isOverdue = bill?.dueDate && new Date(bill.dueDate) < now;
@@ -154,133 +152,96 @@ export default function DocumentsGrid({
               tabIndex={0}
               onClick={() => setSelected(doc)}
               onKeyDown={(e) => e.key === "Enter" && setSelected(doc)}
-              className="group cursor-pointer text-left rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[hsl(var(--primary)/0.5)] hover:shadow-md"
+              className="group flex cursor-pointer items-center gap-4 px-5 py-4 transition hover:bg-[hsl(var(--bg))]"
             >
-              {/* Header row */}
-              <div className="flex items-start gap-3">
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                    doc.docType === "bill"
-                      ? "bg-emerald-500/10 text-emerald-600"
-                      : doc.docType === "contract"
-                        ? "bg-blue-500/10 text-blue-600"
-                        : "bg-gray-500/10 text-gray-600"
-                  }`}
-                >
-                  {doc.docType === "bill" ? (
-                    <Receipt className="h-5 w-5" />
-                  ) : doc.docType === "contract" ? (
-                    <FileCheck className="h-5 w-5" />
-                  ) : (
-                    <FileText className="h-5 w-5" />
-                  )}
-                </div>
+              {/* Icon */}
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                doc.docType === "bill"
+                  ? "bg-emerald-500/10 text-emerald-600"
+                  : doc.docType === "contract"
+                    ? "bg-blue-500/10 text-blue-600"
+                    : "bg-gray-500/10 text-gray-600"
+              }`}>
+                {doc.docType === "bill" ? (
+                  <Receipt className="h-4 w-4" />
+                ) : doc.docType === "contract" ? (
+                  <FileCheck className="h-4 w-4" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+              </div>
 
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate">
-                    {doc.serviceName ?? doc.originalFilename}
-                  </p>
-                  {doc.serviceName && (
-                    <p className="text-xs text-[hsl(var(--muted-ink))] truncate mt-0.5">
-                      {doc.originalFilename}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0">
-                  {confirmId === doc.id ? (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(doc.id);
-                        }}
-                        disabled={deletingId === doc.id}
-                        className="rounded-md px-2 py-1 text-xs font-medium text-white bg-red-500 hover:bg-red-600 transition disabled:opacity-50"
-                      >
-                        {deletingId === doc.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          "Delete"
-                        )}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmId(null);
-                        }}
-                        className="rounded-md px-2 py-1 text-xs font-medium text-[hsl(var(--muted-ink))] hover:bg-[hsl(var(--bg))] transition"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setConfirmId(doc.id);
-                      }}
-                      className="rounded-lg p-1.5 text-[hsl(var(--muted-ink))] opacity-0 group-hover:opacity-100 transition hover:bg-red-500/10 hover:text-red-500"
-                      aria-label="Delete document"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                  <ChevronRight className="h-4 w-4 text-[hsl(var(--muted-ink))] transition group-hover:text-[hsl(var(--primary))] group-hover:translate-x-0.5" />
-                </div>
+              {/* Name + filename */}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">
+                  {doc.serviceName ?? doc.originalFilename}
+                </p>
+                <p className="truncate text-xs text-[hsl(var(--muted-ink))]">
+                  {doc.serviceName ? doc.originalFilename : `Uploaded ${new Date(doc.createdAt).toLocaleDateString()}`}
+                </p>
               </div>
 
               {/* Badges */}
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    doc.docType === "bill"
-                      ? "bg-emerald-500/10 text-emerald-700"
-                      : doc.docType === "contract"
-                        ? "bg-blue-500/10 text-blue-700"
-                        : "bg-gray-500/10 text-gray-700"
-                  }`}
-                >
-                  {doc.docType === "bill"
-                    ? bill
-                      ? getInvoiceTypeLabel(bill)
-                      : "Invoice / Bill"
+              <div className="hidden sm:flex items-center gap-2 shrink-0">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  doc.docType === "bill"
+                    ? "bg-emerald-500/10 text-emerald-700"
                     : doc.docType === "contract"
-                      ? "Contract"
-                      : "Document"}
+                      ? "bg-blue-500/10 text-blue-700"
+                      : "bg-gray-500/10 text-gray-700"
+                }`}>
+                  {doc.docType === "bill"
+                    ? bill ? getInvoiceTypeLabel(bill) : "Invoice / Bill"
+                    : doc.docType === "contract" ? "Contract" : "Document"}
                 </span>
 
                 {bill && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--primary)/0.1)] px-2 py-0.5 text-xs font-semibold text-[hsl(var(--primary))]">
-                    <DollarSign className="h-3 w-3" />
-                    {bill.amount.toFixed(2)}
+                  <span className="flex items-center gap-1 rounded-full bg-[hsl(var(--primary)/0.1)] px-2 py-0.5 text-xs font-semibold text-[hsl(var(--primary))]">
+                    <DollarSign className="h-3 w-3" />{bill.amount.toFixed(2)}
                   </span>
                 )}
 
                 {bill?.dueDate && (
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                      isOverdue
-                        ? "bg-red-500/10 text-red-600"
-                        : isDueSoon
-                          ? "bg-amber-500/10 text-amber-600"
-                          : "bg-gray-500/10 text-gray-600"
-                    }`}
-                  >
+                  <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                    isOverdue ? "bg-red-500/10 text-red-600"
+                      : isDueSoon ? "bg-amber-500/10 text-amber-600"
+                      : "bg-[hsl(var(--muted-soft))] text-[hsl(var(--muted-ink))]"
+                  }`}>
                     <Calendar className="h-3 w-3" />
-                    {isOverdue
-                      ? `Overdue · ${bill.dueDate}`
-                      : isDueSoon
-                        ? `Due soon · ${bill.dueDate}`
-                        : `Due ${bill.dueDate}`}
+                    {isOverdue ? `Overdue · ${bill.dueDate}` : isDueSoon ? `Due soon · ${bill.dueDate}` : `Due ${bill.dueDate}`}
                   </span>
                 )}
               </div>
 
-              {/* Footer */}
-              <p className="mt-2.5 text-xs text-[hsl(var(--muted-ink))]">
-                Uploaded {new Date(doc.createdAt).toLocaleDateString()}
-              </p>
+              {/* Actions */}
+              <div className="flex items-center gap-1 shrink-0">
+                {confirmId === doc.id ? (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
+                      disabled={deletingId === doc.id}
+                      className="rounded-md bg-red-500 px-2 py-1 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                    >
+                      {deletingId === doc.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Delete"}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmId(null); }}
+                      className="rounded-md px-2 py-1 text-xs text-[hsl(var(--muted-ink))] hover:bg-[hsl(var(--bg))]"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConfirmId(doc.id); }}
+                    className="rounded-lg p-1.5 text-[hsl(var(--muted-ink))] opacity-0 group-hover:opacity-100 transition hover:bg-red-500/10 hover:text-red-500"
+                    aria-label="Delete document"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <ChevronRight className="h-4 w-4 text-[hsl(var(--muted-ink))] transition group-hover:text-[hsl(var(--primary))] group-hover:translate-x-0.5" />
+              </div>
             </div>
           );
         })}

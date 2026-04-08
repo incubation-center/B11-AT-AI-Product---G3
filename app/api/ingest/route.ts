@@ -13,6 +13,15 @@ import {
 } from "@/lib/ai/rag-core";
 import { getPlanForUser } from "@/lib/user-plan";
 import { canAddBill } from "@/lib/plans";
+import { db } from "@/db/drizzle";
+import { contractsTable } from "@/db/schema/tableSchema";
+import { and, eq } from "drizzle-orm";
+
+async function removeDocument({ docId, userId }: { docId: string; userId: string }) {
+  await db.delete(contractsTable).where(
+    and(eq(contractsTable.id, docId), eq(contractsTable.userId, userId)),
+  );
+}
 
 type DocClassification = {
   doc_type: "contract" | "bill" | "other";
@@ -296,6 +305,15 @@ export async function POST(request: Request) {
       categoryHint = classification.category;
     }
 
+    // Only store contracts and bills — skip unrecognized documents
+    if (docType === "other") {
+      return NextResponse.json({
+        status: "skipped",
+        reason: "not_invoice_or_contract",
+        message: "This document does not appear to be an invoice, bill, or contract. Nothing was saved.",
+      });
+    }
+
     const indexed = await indexDocument({
       userId,
       serviceName,
@@ -380,6 +398,7 @@ export async function POST(request: Request) {
             usage,
             isRecurring,
             invoiceType: invoiceDecision.invoiceType,
+            recurrenceStatus: "active" as const,
             classificationReason: invoiceDecision.reason,
             classificationEvidence: invoiceDecision.evidence,
             classificationConfidence: invoiceDecision.confidence,
@@ -387,6 +406,14 @@ export async function POST(request: Request) {
             createdAt: new Date().toISOString(),
           };
           await appendBillRecord(billRecord);
+        } else {
+          // No amount found — remove the indexed document so it doesn't show in documents list
+          await removeDocument({ docId: indexed.document.id, userId });
+          return NextResponse.json({
+            status: "skipped",
+            reason: "no_payment_amount",
+            message: "No invoice amount was found. This does not appear to be a valid invoice.",
+          });
         }
       } catch {
         billRecord = null;

@@ -37,8 +37,8 @@ export default async function AlertsPage() {
         <p className="mb-3 text-sm text-[hsl(var(--muted-ink))]">
           Reminder window:{" "}
           <span className="font-medium text-[hsl(var(--ink))]">
-            {data.reminderDaysBeforeDue} day
-            {data.reminderDaysBeforeDue === 1 ? "" : "s"}
+            {data.reminderDaysBeforeDue.join(", ")} day
+            {data.reminderDaysBeforeDue.length === 1 && data.reminderDaysBeforeDue[0] === 1 ? "" : "s"}
           </span>{" "}
           before due date.
         </p>
@@ -50,11 +50,12 @@ export default async function AlertsPage() {
       </section>
 
       <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
-        <div className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3">
-          <h2 className="text-xl font-semibold text-white">Due Reminders</h2>
-          <p className="mt-1 text-sm text-white/85">
-            In-system reminders for recurring invoices within your reminder window.
-          </p>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-6 w-1 rounded-full bg-[hsl(var(--primary))]" />
+          <div>
+            <h2 className="text-base font-semibold text-[hsl(var(--ink))]">Due Reminders</h2>
+            <p className="text-xs text-[hsl(var(--muted-ink))]">In-system reminders for recurring invoices within your reminder window.</p>
+          </div>
         </div>
         <div className="mt-4 space-y-2">
           {data.dueReminders.length === 0 && (
@@ -80,11 +81,12 @@ export default async function AlertsPage() {
       </section>
 
       <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
-        <div className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3">
-          <h2 className="text-xl font-semibold text-white">Needs Review</h2>
-          <p className="mt-1 text-sm text-white/85">
-            AI classifications under 70% confidence.
-          </p>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-6 w-1 rounded-full bg-[hsl(var(--primary))]" />
+          <div>
+            <h2 className="text-base font-semibold text-[hsl(var(--ink))]">Needs Review</h2>
+            <p className="text-xs text-[hsl(var(--muted-ink))]">AI classifications under 70% confidence.</p>
+          </div>
         </div>
         <div className="mt-4 space-y-2">
           {lowConfidenceBills.length === 0 && (

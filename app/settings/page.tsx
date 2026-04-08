@@ -1,10 +1,12 @@
 import WorkspaceShell from "@/components/WorkspaceShell";
 import ReminderSettingsCard from "@/components/ReminderSettingsCard";
 import EmailReminderSettingsCard from "@/components/EmailReminderSettingsCard";
+import TelegramLinkCard from "@/components/TelegramLinkCard";
 import PlanUsageCard from "@/components/PlanUsageCard";
 import { getWorkspaceData } from "@/lib/workspace-data";
 import { getDueReminderEmailEnabledForUser } from "@/lib/notification-preferences";
 import { getReminderDeliveryHistoryForUser } from "@/lib/reminder-delivery";
+import { getTelegramLinkByUserId } from "@/lib/telegram-linking";
 
 function formatDateTime(value: string): string {
   const dt = new Date(value);
@@ -22,9 +24,10 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const data = await getWorkspaceData();
-  const [dueReminderEmailEnabled, reminderHistory] = await Promise.all([
+  const [dueReminderEmailEnabled, reminderHistory, telegramLink] = await Promise.all([
     getDueReminderEmailEnabledForUser(data.userId),
     getReminderDeliveryHistoryForUser({ userId: data.userId, limit: 20 }),
+    getTelegramLinkByUserId(data.userId),
   ]);
 
   const billById = new Map(data.userBills.map((bill) => [bill.id, bill]));
@@ -48,15 +51,17 @@ export default async function SettingsPage() {
         <div className="mt-4">
           <ReminderSettingsCard initialDays={data.reminderDaysBeforeDue} />
           <EmailReminderSettingsCard initialEnabled={dueReminderEmailEnabled} />
+          <TelegramLinkCard isLinked={!!telegramLink} />
         </div>
       </section>
 
       <section className="mt-6 rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-6 shadow-sm">
-        <div className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3">
-          <h2 className="text-xl font-semibold text-white">Reminder Email History</h2>
-          <p className="mt-1 text-sm text-white/85">
-            Recent due reminder emails sent to your account.
-          </p>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-6 w-1 rounded-full bg-[hsl(var(--primary))]" />
+          <div>
+            <h2 className="text-base font-semibold text-[hsl(var(--ink))]">Reminder Email History</h2>
+            <p className="text-xs text-[hsl(var(--muted-ink))]">Recent due reminder emails sent to your account.</p>
+          </div>
         </div>
 
         {reminderHistory.length === 0 ? (
