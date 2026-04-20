@@ -53,7 +53,6 @@ Create a `.env` file in the root directory and fill in the following:
 
 ```env
 # AI
-GEMINI_API_KEY=
 OPENAI_API_KEY=
 
 # Database
