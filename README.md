@@ -24,7 +24,7 @@ Duey is a smart subscription and bill management app. It uses AI to automaticall
 | Styling | Tailwind CSS |
 | Auth | Better Auth |
 | Database | PostgreSQL (Neon) + Drizzle ORM |
-| AI | OpenAI / Gemini |
+| AI | OpenAI |
 | Vector DB | Pinecone |
 | Email | Nodemailer (Gmail SMTP) |
 | Payments | Stripe |
