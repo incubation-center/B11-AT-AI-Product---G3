@@ -8,18 +8,15 @@ import {
 
 export const dynamic = "force-dynamic";
 
-async function resolveUserId(bodyUserId?: string): Promise<string | null> {
-  if (bodyUserId) return bodyUserId;
+async function getAuthenticatedUserId(): Promise<string | null> {
   const hdrs = await headers();
-  const headerUserId = hdrs.get("x-user-id");
-  if (headerUserId) return headerUserId;
   const session = await auth.api.getSession({ headers: hdrs });
   return session?.user?.id ?? null;
 }
 
 export async function GET() {
   try {
-    const userId = await resolveUserId();
+    const userId = await getAuthenticatedUserId();
     if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
@@ -41,12 +38,10 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    const userId = await getAuthenticatedUserId();
     const body = (await request.json()) as {
-      user_id?: string;
       due_reminder_email_enabled?: boolean;
     };
-
-    const userId = await resolveUserId(body.user_id);
     if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }

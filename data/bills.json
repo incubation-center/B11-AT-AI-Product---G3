@@ -519,6 +519,44 @@
       "sourceDocumentId": null,
       "createdAt": "2026-03-30T16:57:22.922Z",
       "recurrenceStatus": "stopped"
+    },
+    {
+      "id": "313eca88-8602-423e-893c-c6ba7fceff1d",
+      "userId": "0bX0shv1jjxzbGd3xjLAFt0pPM2RsKt4",
+      "serviceName": "Netflix",
+      "billDate": "2024-04-03",
+      "dueDate": null,
+      "amount": 149,
+      "usage": null,
+      "isRecurring": true,
+      "invoiceType": "recurring",
+      "recurrenceStatus": "active",
+      "classificationReason": "The document contains evidence of an ongoing billing cycle with service period mentioned.",
+      "classificationEvidence": [
+        "Service Period 04/03/24—03/04/24"
+      ],
+      "classificationConfidence": 1,
+      "sourceDocumentId": "f05b5b55-3d19-408e-9ac3-78523181bbb5",
+      "createdAt": "2026-04-09T09:46:50.490Z"
+    },
+    {
+      "id": "80dc1594-947f-42ec-af3e-7c7a67449da9",
+      "userId": "0bX0shv1jjxzbGd3xjLAFt0pPM2RsKt4",
+      "serviceName": "null",
+      "billDate": "2023-10-25",
+      "dueDate": null,
+      "amount": 5,
+      "usage": null,
+      "isRecurring": false,
+      "invoiceType": "one_time",
+      "recurrenceStatus": "active",
+      "classificationReason": "The document does not contain evidence of an ongoing billing cycle.",
+      "classificationEvidence": [
+        "Thank You For Your Purchase!"
+      ],
+      "classificationConfidence": 1,
+      "sourceDocumentId": "3cb0368c-04dd-44fd-9d7b-ab45705ad913",
+      "createdAt": "2026-04-09T09:47:28.184Z"
     }
   ]
 }

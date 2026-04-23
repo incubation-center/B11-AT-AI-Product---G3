@@ -44,7 +44,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, iconColor: "text-blue-500" },
       { href: "/invoices",  label: "Invoices",  icon: ReceiptText,     iconColor: "text-indigo-500", countKey: "invoices" },
-      { href: "/documents", label: "Documents", icon: Files,            iconColor: "text-violet-500", countKey: "documents" },
+      { href: "/upload", label: "Upload", icon: Files,            iconColor: "text-violet-500", countKey: "documents" },
       { href: "/alerts",    label: "Alerts",    icon: TriangleAlert,    iconColor: "text-amber-500",  countKey: "alerts" },
       { href: "/services",  label: "Services",  icon: Building2,        iconColor: "text-teal-500",   countKey: "services" },
     ],

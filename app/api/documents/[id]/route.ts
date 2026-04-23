@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
 import { and, eq } from "drizzle-orm";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { db } from "@/db/drizzle";
 import { billsTable, contractsTable } from "@/db/schema/tableSchema";
 
@@ -17,8 +19,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("user_id");
+    const hdrs = await headers();
+    const session = await auth.api.getSession({ headers: hdrs });
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     if (!id) {
       return NextResponse.json(
@@ -49,7 +56,7 @@ export async function DELETE(
         { status: 404 },
       );
     }
-    if (userId && doc.userId !== userId) {
+    if (doc.userId !== userId) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
@@ -60,36 +67,35 @@ export async function DELETE(
         .where(eq(contractsTable.id, id))
         .limit(1);
 
-      if (dbDoc.length > 0) {
-        if (userId && dbDoc[0].userId !== userId) {
-          return NextResponse.json({ error: "forbidden" }, { status: 403 });
-        }
-
-        await db
-          .delete(billsTable)
-          .where(eq(billsTable.sourceDocumentId, id));
-
-        await db
-          .delete(contractsTable)
-          .where(
-            userId
-              ? and(eq(contractsTable.id, id), eq(contractsTable.userId, userId))
-              : eq(contractsTable.id, id),
-          );
+      if (dbDoc.length > 0 && dbDoc[0].userId !== userId) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
       }
     }
 
-    // Remove document, its chunks, and any linked bill records
-    store.documents = store.documents.filter((d) => d.id !== id);
-    store.chunks = store.chunks.filter((c) => c.documentId !== id);
-    billsStore.records = billsStore.records.filter(
-      (b) => b.sourceDocumentId !== id,
-    );
+    // Compute all mutations in memory before touching any store
+    const newStore = {
+      ...store,
+      documents: store.documents.filter((d) => d.id !== id),
+      chunks: store.chunks.filter((c) => c.documentId !== id),
+    };
+    const newBillsStore = {
+      ...billsStore,
+      records: billsStore.records.filter((b) => b.sourceDocumentId !== id),
+    };
 
-    await Promise.all([
-      writeFile(VECTOR_STORE_PATH, JSON.stringify(store, null, 2), "utf8"),
-      writeFile(BILLS_PATH, JSON.stringify(billsStore, null, 2), "utf8"),
-    ]);
+    // Write JSON files sequentially so a failure on the first prevents the second
+    await writeFile(VECTOR_STORE_PATH, JSON.stringify(newStore, null, 2), "utf8");
+    await writeFile(BILLS_PATH, JSON.stringify(newBillsStore, null, 2), "utf8");
+
+    // DB deletes run inside a transaction so both succeed or both roll back
+    if (process.env.DATABASE_URL) {
+      await db.transaction(async (tx) => {
+        await tx.delete(billsTable).where(eq(billsTable.sourceDocumentId, id));
+        await tx
+          .delete(contractsTable)
+          .where(and(eq(contractsTable.id, id), eq(contractsTable.userId, userId)));
+      });
+    }
 
     return NextResponse.json({ deleted: id });
   } catch (error) {

@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUserId } from "@/lib/get-authenticated-user-id";
 import { readBillRecords } from "@/lib/ai/rag-core";
 
 type UpcomingRequest = {
-  user_id?: string;
   days?: number;
 };
 
@@ -41,16 +39,6 @@ function normalizeDays(input: number | undefined): number {
   return Math.max(1, Math.min(30, Math.floor(input)));
 }
 
-async function resolveUserId(bodyUserId?: string): Promise<string | null> {
-  if (bodyUserId) return bodyUserId;
-
-  const hdrs = await headers();
-  const headerUserId = hdrs.get("x-user-id");
-  if (headerUserId) return headerUserId;
-
-  const session = await auth.api.getSession({ headers: hdrs });
-  return session?.user?.id ?? null;
-}
 
 function mapUpcoming(params: {
   bills: Awaited<ReturnType<typeof readBillRecords>>;
@@ -95,14 +83,9 @@ function mapUpcoming(params: {
 }
 
 async function handle(userInput: UpcomingRequest) {
-  const userId = await resolveUserId(userInput.user_id);
+  const userId = await getAuthenticatedUserId();
   if (!userId) {
-    return NextResponse.json(
-      {
-        error: "user_id is required (body/query, x-user-id header, or authenticated session)",
-      },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const days = normalizeDays(userInput.days);
@@ -111,7 +94,6 @@ async function handle(userInput: UpcomingRequest) {
   const items = mapUpcoming({ bills, userId, days, now });
 
   return NextResponse.json({
-    user_id: userId,
     today: now.toISOString().slice(0, 10),
     window_days: days,
     count: items.length,
@@ -121,10 +103,9 @@ async function handle(userInput: UpcomingRequest) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const user_id = searchParams.get("user_id") ?? undefined;
   const daysRaw = searchParams.get("days");
   const days = daysRaw ? Number(daysRaw) : undefined;
-  return handle({ user_id, days });
+  return handle({ days });
 }
 
 export async function POST(request: Request) {

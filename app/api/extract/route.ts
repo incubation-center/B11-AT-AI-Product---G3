@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUserId } from "@/lib/get-authenticated-user-id";
 import {
   generateStrictJson,
   readStore,
@@ -21,17 +20,6 @@ type ExtractionOutput = {
 
 export const dynamic = "force-dynamic";
 
-async function resolveUserId(bodyUserId?: string): Promise<string | undefined> {
-  if (bodyUserId) return bodyUserId;
-
-  const hdrs = await headers();
-  const headerUserId = hdrs.get("x-user-id");
-  if (headerUserId) return headerUserId;
-
-  const session = await auth.api.getSession({ headers: hdrs });
-  return session?.user?.id;
-}
-
 const QUERIES = [
   "payment due date and invoice due clause",
   "current amount total payable charge fee",
@@ -39,64 +27,88 @@ const QUERIES = [
   "penalty late fee auto renewal hidden clause",
 ];
 
-async function runSearch(params: {
-  userId?: string;
-  documentId?: string;
-  serviceName?: string;
-  docType?: DocType;
-}) {
+// A chunk below this cosine score is likely unrelated noise.
+const MIN_CHUNK_SCORE = 0.25;
+// A retrieval whose average score is below this should be treated as low-confidence.
+const LOW_CONFIDENCE_AVG_SCORE = 0.35;
+
+type RetrievalTier = "exact" | "relaxed_service" | "relaxed_type";
+type Chunk = Awaited<ReturnType<typeof semanticSearch>>[number];
+
+async function runSearch(
+  params: {
+    userId?: string;
+    documentId?: string;
+    serviceName?: string;
+    docType?: DocType;
+  },
+  topK: number,
+): Promise<Chunk[]> {
   const results = await Promise.all(
-    QUERIES.map((query) => semanticSearch({ query, topK: 4, ...params })),
+    QUERIES.map((query) => semanticSearch({ query, topK, ...params })),
   );
-  return uniqueById(results.flat()).slice(0, 10);
+  return uniqueById(results.flat())
+    .filter((c) => c.score >= MIN_CHUNK_SCORE)
+    .sort((a, b) => b.score - a.score);
+}
+
+async function retrieveWithTiering(
+  userId: string,
+  body: { document_id?: string; service_name?: string; doc_type?: DocType },
+): Promise<{ chunks: Chunk[]; tier: RetrievalTier } | null> {
+  // Tier 1: all filters applied, widest topK
+  const exact = await runSearch(
+    {
+      userId,
+      documentId: body.document_id,
+      serviceName: body.service_name,
+      docType: body.doc_type,
+    },
+    4,
+  );
+  if (exact.length > 0) return { chunks: exact.slice(0, 10), tier: "exact" };
+
+  // Tier 2: drop service filter, narrow topK so weak matches don't dominate
+  if (body.service_name) {
+    const relaxed = await runSearch(
+      { userId, documentId: body.document_id, docType: body.doc_type },
+      3,
+    );
+    if (relaxed.length > 0) {
+      return { chunks: relaxed.slice(0, 6), tier: "relaxed_service" };
+    }
+  }
+
+  // Tier 3: drop docType too, narrowest topK
+  if (body.doc_type) {
+    const relaxed = await runSearch(
+      { userId, documentId: body.document_id },
+      3,
+    );
+    if (relaxed.length > 0) {
+      return { chunks: relaxed.slice(0, 5), tier: "relaxed_type" };
+    }
+  }
+
+  return null;
 }
 
 export async function POST(request: Request) {
   try {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = (await request.json()) as {
-      user_id?: string;
       document_id?: string;
       service_name?: string;
       doc_type?: DocType;
     };
 
-    const userId = await resolveUserId(body.user_id);
-    if (!userId) {
-      return NextResponse.json(
-        {
-          error:
-            "user_id is required (body, x-user-id header, or authenticated session)",
-        },
-        { status: 401 },
-      );
-    }
+    const retrieval = await retrieveWithTiering(userId, body);
 
-    // 1st attempt: use all provided filters (no default docType so all types are searched)
-    let merged = await runSearch({
-      userId,
-      documentId: body.document_id,
-      serviceName: body.service_name,
-      docType: body.doc_type,
-    });
-
-    // 2nd attempt: drop service_name (stored chunks may have serviceName: null)
-    if (merged.length === 0 && body.service_name) {
-      merged = await runSearch({
-        userId,
-        documentId: body.document_id,
-        docType: body.doc_type,
-      });
-    }
-
-    // 3rd attempt: drop docType filter as well — just match by user/document
-    if (merged.length === 0 && body.doc_type) {
-      merged = await runSearch({
-        userId,
-        documentId: body.document_id,
-      });
-    }
-
-    if (merged.length === 0) {
+    if (!retrieval) {
       const store = await readStore();
       const available = store.documents
         .filter((d) => d.userId === userId)
@@ -116,12 +128,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const context = merged
+    const { chunks, tier } = retrieval;
+    const averageScore =
+      chunks.reduce((sum, c) => sum + c.score, 0) / chunks.length;
+    const isLowConfidence =
+      tier !== "exact" || averageScore < LOW_CONFIDENCE_AVG_SCORE;
+
+    const context = chunks
       .map(
         (item) =>
           `[doc:${item.documentId} type:${item.docType} service:${item.serviceName ?? "unknown"} score:${item.score.toFixed(3)} chunk:${item.chunkIndex}] ${item.text}`,
       )
       .join("\n\n");
+
+    const strictnessHint = isLowConfidence
+      ? " The retrieved context is broadened or has low average similarity — prefer null / [] over guessing when a field is not clearly supported by an exact quote."
+      : "";
 
     const output = await generateStrictJson<ExtractionOutput>(
       [
@@ -139,12 +161,21 @@ export async function POST(request: Request) {
         '  "hidden_rules":"string[] — auto-renewal clauses, price increase terms, or []",',
         '  "evidence":"string[] — exact quotes from the document supporting each extracted field"',
         "}",
-        "Use null or [] when a field is genuinely not present in the document.",
+        "Use null or [] when a field is genuinely not present in the document." +
+          strictnessHint,
       ].join(" "),
       context,
     );
 
-    return NextResponse.json(output);
+    return NextResponse.json({
+      ...output,
+      retrieval_metadata: {
+        tier,
+        chunk_count: chunks.length,
+        average_score: Number(averageScore.toFixed(3)),
+        confidence: isLowConfidence ? "low" : "high",
+      },
+    });
   } catch (error) {
     return NextResponse.json(
       {

@@ -16,7 +16,7 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false, // Set to false for testing, true for production
+    requireEmailVerification: true,
     sendResetPassword: async ({ user, url, token }) => {
       await sendResetEmail({
         user: { email: user.email, name: user.name },

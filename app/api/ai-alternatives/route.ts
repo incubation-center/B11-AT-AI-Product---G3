@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
 import { auth } from "@/lib/auth";
 import { generateStrictJson } from "@/lib/ai/rag-core";
 
@@ -22,37 +20,6 @@ type AiAlternativesResult = {
   alternatives: AiAlternative[];
   generated_at: string;
 };
-
-type CacheStore = {
-  entries: Record<string, AiAlternativesResult>;
-};
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const CACHE_PATH = path.join(DATA_DIR, "ai-alternatives-cache.json");
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-async function readCache(): Promise<CacheStore> {
-  await mkdir(DATA_DIR, { recursive: true });
-  try {
-    const raw = await readFile(CACHE_PATH, "utf8");
-    return JSON.parse(raw) as CacheStore;
-  } catch {
-    return { entries: {} };
-  }
-}
-
-async function writeCache(store: CacheStore): Promise<void> {
-  await writeFile(CACHE_PATH, JSON.stringify(store, null, 2), "utf8");
-}
-
-function cacheKey(userId: string, serviceName: string): string {
-  return `${userId}:${serviceName.toLowerCase().trim()}`;
-}
-
-function isFresh(entry: AiAlternativesResult): boolean {
-  const age = Date.now() - new Date(entry.generated_at).getTime();
-  return age < CACHE_TTL_MS;
-}
 
 async function generateAlternatives(
   serviceName: string,
@@ -86,8 +53,6 @@ export async function POST(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const userId = session.user.id;
-
   const body = (await request.json()) as {
     service_name?: string;
     current_monthly?: number;
@@ -104,14 +69,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const cache = await readCache();
-  const key = cacheKey(userId, serviceName);
-  const cached = cache.entries[key];
-
-  if (cached && isFresh(cached) && !body.force_refresh) {
-    return NextResponse.json({ ...cached, from_cache: true });
-  }
-
   try {
     const alternatives = await generateAlternatives(serviceName, currentMonthly);
 
@@ -121,9 +78,6 @@ export async function POST(request: Request) {
       alternatives,
       generated_at: new Date().toISOString(),
     };
-
-    cache.entries[key] = result;
-    await writeCache(cache);
 
     return NextResponse.json({ ...result, from_cache: false });
   } catch (error) {

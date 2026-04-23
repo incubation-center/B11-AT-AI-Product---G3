@@ -1,7 +1,6 @@
 import { randomUUID, createHash } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/drizzle";
@@ -11,6 +10,16 @@ const pdfParse = require("pdf-parse/lib/pdf-parse") as (
   buffer: Buffer,
 ) => Promise<{ text: string }>;
 import mammoth from "mammoth";
+
+// DEMO_MODE is explicitly forbidden in production to prevent mock data leaking to real users.
+if (process.env.DEMO_MODE === "true" && process.env.NODE_ENV === "production") {
+  throw new Error(
+    "[rag-core] DEMO_MODE=true is not allowed in NODE_ENV=production. " +
+      "Remove DEMO_MODE from your production environment variables.",
+  );
+}
+
+const IS_DEMO = process.env.DEMO_MODE === "true" && process.env.NODE_ENV !== "production";
 
 export type DocType = "contract" | "bill" | "other";
 export type InvoiceType = "recurring" | "one_time";
@@ -74,7 +83,7 @@ const VECTOR_STORE_PATH = path.join(DATA_DIR, "vector-store.json");
 const BILLS_PATH = path.join(DATA_DIR, "bills.json");
 const EXECUTION_LOG_PATH = path.join(DATA_DIR, "execution-log.json");
 
-const EMBEDDING_DIM = 256;
+const EMBEDDING_DIM = 1536; // matches text-embedding-3-small output dimension
 
 function normalizeDocTypeForDb(value: DocType): "contract" | "bill" | "receipt" {
   if (value === "contract" || value === "bill") return value;
@@ -177,13 +186,6 @@ async function persistBillToDb(record: BillRecord) {
   });
 }
 
-function getGeminiClient(): GoogleGenerativeAI {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is missing");
-  }
-  return new GoogleGenerativeAI(apiKey);
-}
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -205,7 +207,10 @@ function getOpenAIClient(): OpenAI {
   return new OpenAI({ apiKey });
 }
 
+const USE_DB = !!process.env.DATABASE_URL;
+
 async function ensureDataFiles() {
+  if (USE_DB) return;
   await mkdir(DATA_DIR, { recursive: true });
 
   await Promise.all([
@@ -234,12 +239,10 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 4): Promise<T> {
         msg.includes("high demand") ||
         msg.includes("overloaded");
       const is429 = msg.includes("429") || msg.includes("Too Many Requests");
-      // "exceeded your current quota" = daily limit hit — retrying won't help
       const isDailyQuotaExhausted = msg.includes("exceeded your current quota");
       if (isDailyQuotaExhausted) {
         throw new Error(
-          "Gemini API daily quota exhausted. Please wait until midnight (PT) for it to reset, " +
-            "or add billing at https://ai.dev/rate-limit to increase limits.",
+          "OpenAI API quota exhausted. Check your usage limits at https://platform.openai.com/usage.",
         );
       }
       if ((!is503 && !is429) || attempt === maxRetries - 1) throw err;
@@ -270,12 +273,14 @@ function parseJson<T>(value: string): T {
 }
 
 export async function readStore(): Promise<StoreShape> {
+  if (USE_DB) return { documents: [], chunks: [] };
   await ensureDataFiles();
   const raw = await readFile(VECTOR_STORE_PATH, "utf8");
   return JSON.parse(raw) as StoreShape;
 }
 
 async function writeStore(store: StoreShape): Promise<void> {
+  if (USE_DB) return;
   await writeFile(VECTOR_STORE_PATH, JSON.stringify(store, null, 2), "utf8");
 }
 
@@ -331,6 +336,29 @@ function normalizeBillRecord(record: BillRecord): BillRecord {
 }
 
 export async function readBillRecords(): Promise<BillRecord[]> {
+  if (USE_DB) {
+    const rows = await db.select().from(billsTable);
+    return rows.map((row) => {
+      const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      return normalizeBillRecord({
+        id: row.id,
+        userId: row.userId,
+        serviceName: row.serviceName,
+        billDate: row.billDate.toISOString().slice(0, 10),
+        dueDate: row.dueDate ? row.dueDate.toISOString().slice(0, 10) : null,
+        amount: parseFloat(row.amount),
+        usage: row.usage ? parseFloat(row.usage) : null,
+        isRecurring: (meta.isRecurring as boolean) ?? false,
+        invoiceType: (meta.invoiceType as InvoiceType) ?? "one_time",
+        recurrenceStatus: (meta.recurrenceStatus as "active" | "stopped") ?? "active",
+        classificationReason: (meta.classificationReason as string) ?? null,
+        classificationEvidence: (meta.classificationEvidence as string[]) ?? [],
+        classificationConfidence: (meta.classificationConfidence as number) ?? null,
+        sourceDocumentId: row.sourceDocumentId ?? null,
+        createdAt: row.createdAt.toISOString(),
+      });
+    });
+  }
   await ensureDataFiles();
   const raw = await readFile(BILLS_PATH, "utf8");
   const parsed = JSON.parse(raw) as { records: BillRecord[] };
@@ -339,9 +367,12 @@ export async function readBillRecords(): Promise<BillRecord[]> {
 
 export async function appendBillRecord(record: BillRecord): Promise<void> {
   const normalized = normalizeBillRecord(record);
-  const records = await readBillRecords();
-  records.push(normalized);
-  await writeFile(BILLS_PATH, JSON.stringify({ records }, null, 2), "utf8");
+
+  if (!USE_DB) {
+    const records = await readBillRecords();
+    records.push(normalized);
+    await writeFile(BILLS_PATH, JSON.stringify({ records }, null, 2), "utf8");
+  }
 
   try {
     await persistBillToDb(normalized);
@@ -380,7 +411,11 @@ export async function updateBillRecord(
   const idx = records.findIndex((r) => r.id === id);
   if (idx === -1) return null;
   records[idx] = normalizeBillRecord({ ...records[idx], ...patch });
-  await writeFile(BILLS_PATH, JSON.stringify({ records }, null, 2), "utf8");
+
+  if (!USE_DB) {
+    await writeFile(BILLS_PATH, JSON.stringify({ records }, null, 2), "utf8");
+  }
+
   await syncBillUpdateToDb(records[idx]);
   return records[idx];
 }
@@ -413,7 +448,9 @@ export async function advanceRecurringBills(): Promise<number> {
   });
 
   if (advanced > 0) {
-    await writeFile(BILLS_PATH, JSON.stringify({ records: updated }, null, 2), "utf8");
+    if (!USE_DB) {
+      await writeFile(BILLS_PATH, JSON.stringify({ records: updated }, null, 2), "utf8");
+    }
     await Promise.all(
       updated
         .filter((b) => b.isRecurring && b.recurrenceStatus !== "stopped")
@@ -425,6 +462,7 @@ export async function advanceRecurringBills(): Promise<number> {
 }
 
 export async function appendExecutionLog(payload: Record<string, unknown>) {
+  if (USE_DB) return;
   await ensureDataFiles();
   const raw = await readFile(EXECUTION_LOG_PATH, "utf8");
   const parsed = JSON.parse(raw) as { records: ExecutionLog[] };
@@ -442,17 +480,47 @@ export function splitTextIntoChunks(
   overlap = 200,
 ): string[] {
   const clean = text.replace(/\r/g, "").trim();
-  if (!clean) {
-    return [];
+  if (!clean) return [];
+
+  // Split at paragraph boundaries to respect semantic units
+  const paragraphs = clean.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const chunks: string[] = [];
+  let current = "";
+
+  for (const para of paragraphs) {
+    if (current.length + para.length + 2 <= chunkSize) {
+      current = current ? `${current}\n\n${para}` : para;
+    } else {
+      if (current) {
+        chunks.push(current);
+        const overlapText = current.slice(-overlap);
+        current = overlapText ? `${overlapText}\n\n${para}` : para;
+      } else {
+        // Paragraph alone exceeds chunkSize — split by sentences
+        const sentences = para.match(/[^.!?]+[.!?]+[\s]*/g) ?? [para];
+        let sentBuf = "";
+        for (const sent of sentences) {
+          if (sentBuf.length + sent.length <= chunkSize) {
+            sentBuf += sent;
+          } else {
+            if (sentBuf) chunks.push(sentBuf.trim());
+            sentBuf = sent;
+          }
+        }
+        current = sentBuf;
+      }
+    }
   }
 
-  const chunks: string[] = [];
-  let start = 0;
+  if (current.trim()) chunks.push(current.trim());
 
-  while (start < clean.length) {
-    const end = Math.min(start + chunkSize, clean.length);
-    chunks.push(clean.slice(start, end));
-    start += chunkSize - overlap;
+  // Final fallback: if no splits happened, character-slice
+  if (chunks.length === 0) {
+    let start = 0;
+    while (start < clean.length) {
+      chunks.push(clean.slice(start, start + chunkSize));
+      start += chunkSize - overlap;
+    }
   }
 
   return chunks;
@@ -476,25 +544,25 @@ function buildFallbackEmbedding(text: string): number[] {
 }
 
 export async function embedText(text: string): Promise<number[]> {
-  try {
-    const client = getGeminiClient();
-    const model = client.getGenerativeModel({ model: "gemini-embedding-001" });
-    const result = await withRetry(() => model.embedContent(text));
-    const values = result.embedding.values;
-    if (!values || !Array.isArray(values) || values.length === 0) {
-      console.warn(
-        "[embedText] Gemini returned empty embedding — falling back to hash-based embedding. Search quality is degraded.",
-      );
-      return buildFallbackEmbedding(text);
-    }
-    return values;
-  } catch (err) {
-    console.warn(
-      "[embedText] Gemini embedding failed — falling back to hash-based embedding. Search quality is degraded.",
-      err instanceof Error ? err.message : err,
-    );
+  // In demo mode there is no API key — hash embedding is acceptable because
+  // all retrieval is illustrative and no real documents are indexed.
+  if (IS_DEMO) {
     return buildFallbackEmbedding(text);
   }
+
+  const openai = getOpenAIClient();
+  const response = await withRetry(() =>
+    openai.embeddings.create({ model: "text-embedding-3-small", input: text }),
+  );
+  const values = response.data[0]?.embedding;
+
+  if (!values || values.length === 0) {
+    throw new Error(
+      "[embedText] OpenAI returned an empty embedding vector. Document indexing and search cannot proceed.",
+    );
+  }
+
+  return values;
 }
 
 async function embedChunksBatched(
@@ -597,76 +665,51 @@ export async function extractTextFromFileWithLayout(
     "Extract all visible text from this document while preserving reading order, table structure, line-item relationships, section headers, and small-footnote clauses. Return plain text only." +
     classifyPart;
 
-  // Try Gemini first for OCR
-  try {
-    const client = getGeminiClient();
-    const model = client.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const mimeType =
-      file.type === "application/pdf" ? "application/pdf" : file.type;
-    const response = await withRetry(() =>
-      model.generateContent([
-        ocrPrompt,
-        { inlineData: { mimeType, data: buffer.toString("base64") } },
-      ]),
-    );
-    return response.response.text().trim();
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    const isQuotaError =
-      msg.includes("quota exhausted") ||
-      msg.includes("exceeded your current quota");
-    if (!isQuotaError) throw error;
+  const openai = getOpenAIClient();
 
-    // Gemini quota exhausted — fall back to OpenAI Vision
-    console.log(
-      "⚠️  Gemini quota exhausted for OCR, falling back to OpenAI Vision...",
-    );
-    const openai = getOpenAIClient();
-
-    // For PDFs: use GPT-4o with file input; for images: use vision
-    if (file.type === "application/pdf") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const completion = await (openai.chat.completions.create as any)({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: ocrPrompt },
-              {
-                type: "file",
-                file: {
-                  filename: file.name,
-                  file_data: `data:application/pdf;base64,${buffer.toString("base64")}`,
-                },
+  // For PDFs: use GPT-4o with file input; for images: use vision
+  if (file.type === "application/pdf") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const completion = await (openai.chat.completions.create as any)({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: ocrPrompt },
+            {
+              type: "file",
+              file: {
+                filename: file.name,
+                file_data: `data:application/pdf;base64,${buffer.toString("base64")}`,
               },
-            ],
-          },
-        ],
-        max_tokens: 4096,
-      });
-      return (completion.choices[0]?.message?.content ?? "").trim();
-    } else {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: ocrPrompt },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${file.type};base64,${buffer.toString("base64")}`,
-                },
+            },
+          ],
+        },
+      ],
+      max_tokens: 4096,
+    });
+    return (completion.choices[0]?.message?.content ?? "").trim();
+  } else {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: ocrPrompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${file.type};base64,${buffer.toString("base64")}`,
               },
-            ],
-          },
-        ],
-        max_tokens: 4096,
-      });
-      return (completion.choices[0]?.message?.content ?? "").trim();
-    }
+            },
+          ],
+        },
+      ],
+      max_tokens: 4096,
+    });
+    return (completion.choices[0]?.message?.content ?? "").trim();
   }
 }
 
@@ -764,6 +807,41 @@ export async function indexDocument(params: {
   return { document, chunkCount: vectorChunks.length };
 }
 
+// Returns a 0-1 score based on what fraction of meaningful query terms appear in text.
+function keywordScore(query: string, text: string): number {
+  const terms = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length > 2);
+  if (terms.length === 0) return 0;
+  const lower = text.toLowerCase();
+  return terms.filter((t) => lower.includes(t)).length / terms.length;
+}
+
+// Reranks candidates by boosting chunks with higher query-term density.
+function rerank(
+  candidates: Array<VectorChunk & { score: number }>,
+  query: string,
+): Array<VectorChunk & { score: number }> {
+  const terms = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length > 2);
+  if (terms.length === 0) return candidates;
+
+  return candidates
+    .map((c) => {
+      const lower = c.text.toLowerCase();
+      const density =
+        terms.reduce((sum, t) => {
+          const matches = (lower.match(new RegExp(t, "g")) ?? []).length;
+          return sum + matches;
+        }, 0) / Math.max(c.text.length / 100, 1);
+      return { ...c, score: c.score + density * 0.05 };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
 export async function semanticSearch(params: {
   query: string;
   topK?: number;
@@ -794,22 +872,29 @@ export async function semanticSearch(params: {
     filtered = filtered.filter((chunk) => chunk.docType === params.docType);
   }
 
-  return filtered
+  const topK = params.topK ?? 5;
+
+  // Hybrid scoring: 70% semantic + 30% keyword overlap
+  const scored = filtered
     .map((chunk) => ({
       ...chunk,
-      score: cosineSimilarity(queryVector, chunk.embedding),
+      score:
+        0.7 * cosineSimilarity(queryVector, chunk.embedding) +
+        0.3 * keywordScore(params.query, chunk.text),
     }))
     .sort((a, b) => b.score - a.score)
-    .slice(0, params.topK ?? 5);
+    .slice(0, topK * 3); // fetch wider candidate set for reranking
+
+  return rerank(scored, params.query).slice(0, topK);
 }
 
 export async function generateStrictJson<T>(
   prompt: string,
   context: string,
 ): Promise<T> {
-  // Demo mode - return mock data for presentations
-  if (process.env.DEMO_MODE === "true") {
-    console.log("DEMO MODE: Returning mock data...");
+  // Demo mode - return mock data for presentations (never runs in production)
+  if (IS_DEMO) {
+    console.warn("[rag-core] DEMO_MODE active — returning mock extraction data. NOT for production use.");
 
     // Detect what type of request based on prompt keywords
     const promptLower = prompt.toLowerCase();
@@ -878,71 +963,40 @@ export async function generateStrictJson<T>(
     return {} as T;
   }
 
-  // Normal mode - try Gemini first, fall back to OpenAI if quota exhausted
-  try {
-    const client = getGeminiClient();
+  const openai = getOpenAIClient();
+  const apiKey = process.env.OPENAI_API_KEY ?? "";
+  const isOpenRouter = apiKey.startsWith("sk-or-v1");
 
-    const model = client.getGenerativeModel({
-      model: "gemini-2.0-flash",
-    });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body: any = {
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a helpful assistant that extracts structured data. Always return valid JSON only, without markdown code fences.",
+      },
+      {
+        role: "user",
+        content: `${prompt}\n\nContext:\n${context}`,
+      },
+    ],
+    temperature: 0.2,
+  };
 
-    const response = await withRetry(() =>
-      model.generateContent(
-        `${prompt}\n\nContext:\n${context}\n\nReturn strict JSON only. Do not include markdown code fences.`,
-      ),
-    );
-
-    return parseJson<T>(response.response.text());
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    const isQuotaError =
-      msg.includes("quota exhausted") ||
-      msg.includes("exceeded your current quota");
-
-    // If quota exhausted, fall back to OpenAI/OpenRouter
-    if (isQuotaError) {
-      const apiKey = process.env.OPENAI_API_KEY ?? "";
-      const isOpenRouter = apiKey.startsWith("sk-or-v1");
-      console.log(
-        `⚠️  Gemini quota exhausted, falling back to ${isOpenRouter ? "OpenRouter" : "OpenAI"}...`,
-      );
-
-      const openai = getOpenAIClient();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const body: any = {
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a helpful assistant that extracts structured data. Always return valid JSON only, without markdown code fences.",
-          },
-          {
-            role: "user",
-            content: `${prompt}\n\nContext:\n${context}`,
-          },
-        ],
-        temperature: 0.2,
-      };
-
-      if (isOpenRouter) {
-        body.model = "meta-llama/llama-3.2-3b-instruct:free";
-        body.models = [
-          "meta-llama/llama-3.2-3b-instruct:free",
-          "mistralai/mistral-7b-instruct:free",
-          "microsoft/phi-3-mini-128k-instruct:free",
-        ];
-      } else {
-        body.model = "gpt-3.5-turbo";
-      }
-
-      const completion = await openai.chat.completions.create(body);
-      const text = completion.choices[0]?.message?.content || "{}";
-      return parseJson<T>(text);
-    }
-
-    // If not a quota error, re-throw
-    throw error;
+  if (isOpenRouter) {
+    body.model = "meta-llama/llama-3.2-3b-instruct:free";
+    body.models = [
+      "meta-llama/llama-3.2-3b-instruct:free",
+      "mistralai/mistral-7b-instruct:free",
+      "microsoft/phi-3-mini-128k-instruct:free",
+    ];
+  } else {
+    body.model = "gpt-4o-mini";
   }
+
+  const completion = await openai.chat.completions.create(body);
+  const text = completion.choices[0]?.message?.content || "{}";
+  return parseJson<T>(text);
 }
 
 export function parseLooseMoney(value: string): number | null {

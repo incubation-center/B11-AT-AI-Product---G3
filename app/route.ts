@@ -239,177 +239,73 @@ function resolveInvoiceDecision(
 
 export const dynamic = "force-dynamic";
 
-// --- Step 1: Auth ---
+async function resolveUserId(
+  formUserId: FormDataEntryValue | null,
+): Promise<string | null> {
+  if (formUserId) return String(formUserId);
 
-async function getAuthenticatedUserId(): Promise<string | null> {
   const hdrs = await headers();
+  const headerUserId = hdrs.get("x-user-id");
+  if (headerUserId) return headerUserId;
+
   const session = await auth.api.getSession({ headers: hdrs });
   return session?.user?.id ?? null;
 }
 
-// --- Step 2: File validation ---
-
-function extractFile(form: FormData): File | null {
-  const file = form.get("file");
-  return file instanceof File ? file : null;
-}
-
-// --- Step 3: Classification ---
-
-type ResolvedClassification = {
-  docType: "contract" | "bill" | "other";
-  serviceName: string | null;
-  categoryHint: string | null;
-};
-
-function resolveClassification(
-  form: FormData,
-  extractedText: string,
-): ResolvedClassification {
-  const overrideDocType = form.get("doc_type");
-  const overrideServiceName = form.get("service_name");
-  const overrideCategoryHint = form.get("category_hint");
-
-  if (overrideDocType && overrideServiceName) {
-    const raw = String(overrideDocType).toLowerCase();
-    return {
-      docType: (["contract", "bill", "other"].includes(raw) ? raw : "contract") as ResolvedClassification["docType"],
-      serviceName: String(overrideServiceName),
-      categoryHint: overrideCategoryHint ? String(overrideCategoryHint) : null,
-    };
-  }
-
-  const classification = parseClassification(extractedText);
-  return {
-    docType: classification.doc_type,
-    serviceName: classification.service_name,
-    categoryHint: classification.category,
-  };
-}
-
-// --- Step 4: Plan limit check ---
-
-async function checkPlanLimit(
-  userId: string,
-): Promise<{ allowed: boolean; error?: object }> {
-  const { PLANS } = await import("@/lib/plans");
-  const [userPlan, allBills] = await Promise.all([
-    getPlanForUser(userId),
-    readBillRecords(),
-  ]);
-  const userBillCount = allBills.filter((b) => b.userId === userId).length;
-  if (!canAddBill(userPlan, userBillCount)) {
-    const max = PLANS[userPlan].maxBills;
-    return {
-      allowed: false,
-      error: {
-        error: "plan_limit_reached",
-        detail: `Your ${userPlan} plan allows up to ${max} bills. Upgrade to add more.`,
-        current: userBillCount,
-        max,
-        plan: userPlan,
-      },
-    };
-  }
-  return { allowed: true };
-}
-
-// --- Step 5: Bill extraction via LLM ---
-
-const BILL_EXTRACTION_PROMPT = [
-  "Extract billing details from this invoice or bill.",
-  "Return JSON with these keys:",
-  "amount: total amount due as a numeric string (e.g. '26.43').",
-  "IMPORTANT currency rule: if the document shows amounts in multiple currencies (e.g. USD and KHR/Riel, or USD and any local currency),",
-  "always prefer and return the USD ($) amount. Never return a local currency amount (KHR, Riel, ៛, or other non-USD currencies) as the amount.",
-  "If only a local currency amount exists with no USD equivalent, convert it to USD using approximate exchange rates, or return null.",
-  "due_date: payment due date (YYYY-MM-DD or MM/DD/YYYY format, or null),",
-  "bill_date: the invoice date or billing date (YYYY-MM-DD or MM/DD/YYYY format, or null),",
-  "usage: numeric usage quantity (e.g. kWh, GB, licenses count) or null if not present,",
-  "invoice_type: must be either 'recurring' or 'one_time'.",
-  "Choose 'recurring' only when the document contains evidence of an ongoing billing cycle such as subscription, monthly or annual fees, service period, rental, insurance premium, utility billing, or renewal language.",
-  "Choose 'one_time' for repairs, purchases, shopping receipts, orders, or invoices without clear evidence of repeat billing.",
-  "If recurring evidence is absent, choose 'one_time'.",
-  "invoice_type_reason: one short sentence explaining why the invoice was classified that way.",
-  "invoice_type_evidence: an array of up to 3 short phrases from the document that support the classification.",
-  "invoice_type_confidence: a number from 0 to 1.",
-  "Return null for any field not found in the document.",
-].join(" ");
-
-async function extractBillDetails(
-  extractedText: string,
-  categoryHint: string | null,
-): Promise<{ billData: BillExtraction; invoiceDecision: InvoiceDecision; amount: number | null }> {
-  await new Promise((r) => setTimeout(r, 1000));
-  const billData = await generateStrictJson<BillExtraction>(
-    BILL_EXTRACTION_PROMPT,
-    extractedText.slice(0, 14000),
-  );
-  const amount = billData.amount ? parseLooseMoney(billData.amount) : null;
-  const invoiceDecision = resolveInvoiceDecision(billData, extractedText, categoryHint);
-  return { billData, invoiceDecision, amount };
-}
-
-// --- Step 6: Bill record construction ---
-
-function buildBillRecord(params: {
-  userId: string;
-  serviceName: string;
-  documentId: string;
-  billData: BillExtraction;
-  invoiceDecision: InvoiceDecision;
-  amount: number;
-}) {
-  const { userId, serviceName, documentId, billData, invoiceDecision, amount } = params;
-  const dueDate = billData.due_date ? parseLikelyDate(billData.due_date) : null;
-  const billDate =
-    (billData.bill_date ? parseLikelyDate(billData.bill_date) : null) ??
-    new Date().toISOString().slice(0, 10);
-
-  return {
-    id: crypto.randomUUID(),
-    userId,
-    serviceName,
-    billDate,
-    dueDate,
-    amount,
-    usage: typeof billData.usage === "number" ? billData.usage : null,
-    isRecurring: invoiceDecision.invoiceType === "recurring",
-    invoiceType: invoiceDecision.invoiceType,
-    recurrenceStatus: "active" as const,
-    classificationReason: invoiceDecision.reason,
-    classificationEvidence: invoiceDecision.evidence,
-    classificationConfidence: invoiceDecision.confidence,
-    sourceDocumentId: documentId,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-// --- Orchestrator ---
-
 export async function POST(request: Request) {
   try {
-    // 1. Auth
-    const userId = await getAuthenticatedUserId();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // 2. File validation
     const form = await request.formData();
-    const file = extractFile(form);
-    if (!file) {
+    const file = form.get("file");
+    if (!(file instanceof File)) {
       return NextResponse.json(
         { error: "file is required (multipart/form-data)" },
         { status: 400 },
       );
     }
 
-    // 3. Text extraction + classification
-    const hasManualOverrides = form.get("doc_type") && form.get("service_name");
-    const extractedText = await extractTextFromFileWithLayout(file, !hasManualOverrides);
-    const { docType, serviceName, categoryHint } = resolveClassification(form, extractedText);
+    const userId = await resolveUserId(form.get("user_id"));
+    if (!userId) {
+      return NextResponse.json(
+        {
+          error:
+            "user_id is required (form field, x-user-id header, or authenticated session)",
+        },
+        { status: 401 },
+      );
+    }
 
+    const overrideDocType = form.get("doc_type");
+    const overrideServiceName = form.get("service_name");
+    const overrideCategoryHint = form.get("category_hint");
+    const hasManualOverrides = overrideDocType && overrideServiceName;
+
+    const extractedText = await extractTextFromFileWithLayout(
+      file,
+      !hasManualOverrides,
+    );
+
+    let docType: "contract" | "bill" | "other";
+    let serviceName: string | null;
+    let categoryHint: string | null;
+
+    if (hasManualOverrides) {
+      docType = (
+        ["contract", "bill", "other"].includes(
+          String(overrideDocType).toLowerCase(),
+        )
+          ? String(overrideDocType).toLowerCase()
+          : "contract"
+      ) as "contract" | "bill" | "other";
+      serviceName = String(overrideServiceName);
+      categoryHint = overrideCategoryHint ? String(overrideCategoryHint) : null;
+    } else {
+      const classification = parseClassification(extractedText);
+      docType = classification.doc_type;
+      serviceName = classification.service_name;
+      categoryHint = classification.category;
+    }
+
+    // Only store contracts and bills — skip unrecognized documents
     if (docType === "other") {
       return NextResponse.json({
         status: "skipped",
@@ -418,13 +314,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Plan limit check
-    const planCheck = await checkPlanLimit(userId);
-    if (!planCheck.allowed) {
-      return NextResponse.json(planCheck.error, { status: 402 });
-    }
-
-    // 5. Vector indexing
     const indexed = await indexDocument({
       userId,
       serviceName,
@@ -435,26 +324,93 @@ export async function POST(request: Request) {
       extractedText,
     });
 
-    // 6. Bill extraction + record creation (bills only)
+    const [userPlan, allBills] = await Promise.all([
+      getPlanForUser(userId),
+      readBillRecords(),
+    ]);
+    const userBillCount = allBills.filter((b) => b.userId === userId).length;
+    if (!canAddBill(userPlan, userBillCount)) {
+      const { PLANS } = await import("@/lib/plans");
+      const max = PLANS[userPlan].maxBills;
+      return NextResponse.json(
+        {
+          error: "plan_limit_reached",
+          detail: `Your ${userPlan} plan allows up to ${max} bills. Upgrade to add more.`,
+          current: userBillCount,
+          max,
+          plan: userPlan,
+        },
+        { status: 402 },
+      );
+    }
+
     let billRecord = null;
     if (docType === "bill" && serviceName) {
+      await new Promise((r) => setTimeout(r, 1000));
       try {
-        const { billData, invoiceDecision, amount } = await extractBillDetails(
+        const billData = await generateStrictJson<BillExtraction>(
+          [
+            "Extract billing details from this invoice or bill.",
+            "Return JSON with these keys:",
+            "amount: total amount due as a numeric string (e.g. '26.43').",
+            "IMPORTANT currency rule: if the document shows amounts in multiple currencies (e.g. USD and KHR/Riel, or USD and any local currency),",
+            "always prefer and return the USD ($) amount. Never return a local currency amount (KHR, Riel, ៛, or other non-USD currencies) as the amount.",
+            "If only a local currency amount exists with no USD equivalent, convert it to USD using approximate exchange rates, or return null.",
+            "due_date: payment due date (YYYY-MM-DD or MM/DD/YYYY format, or null),",
+            "bill_date: the invoice date or billing date (YYYY-MM-DD or MM/DD/YYYY format, or null),",
+            "usage: numeric usage quantity (e.g. kWh, GB, licenses count) or null if not present,",
+            "invoice_type: must be either 'recurring' or 'one_time'.",
+            "Choose 'recurring' only when the document contains evidence of an ongoing billing cycle such as subscription, monthly or annual fees, service period, rental, insurance premium, utility billing, or renewal language.",
+            "Choose 'one_time' for repairs, purchases, shopping receipts, orders, or invoices without clear evidence of repeat billing.",
+            "If recurring evidence is absent, choose 'one_time'.",
+            "invoice_type_reason: one short sentence explaining why the invoice was classified that way.",
+            "invoice_type_evidence: an array of up to 3 short phrases from the document that support the classification.",
+            "invoice_type_confidence: a number from 0 to 1.",
+            "Return null for any field not found in the document.",
+          ].join(" "),
+          extractedText.slice(0, 14000),
+        );
+
+        const amount = billData.amount
+          ? parseLooseMoney(billData.amount)
+          : null;
+        const dueDate = billData.due_date
+          ? parseLikelyDate(billData.due_date)
+          : null;
+        const billDate = billData.bill_date
+          ? (parseLikelyDate(billData.bill_date) ??
+            new Date().toISOString().slice(0, 10))
+          : new Date().toISOString().slice(0, 10);
+        const usage =
+          typeof billData.usage === "number" ? billData.usage : null;
+        const invoiceDecision = resolveInvoiceDecision(
+          billData,
           extractedText,
           categoryHint,
         );
+        const isRecurring = invoiceDecision.invoiceType === "recurring";
 
         if (amount !== null) {
-          billRecord = buildBillRecord({
+          billRecord = {
+            id: crypto.randomUUID(),
             userId,
             serviceName,
-            documentId: indexed.document.id,
-            billData,
-            invoiceDecision,
+            billDate,
+            dueDate,
             amount,
-          });
+            usage,
+            isRecurring,
+            invoiceType: invoiceDecision.invoiceType,
+            recurrenceStatus: "active" as const,
+            classificationReason: invoiceDecision.reason,
+            classificationEvidence: invoiceDecision.evidence,
+            classificationConfidence: invoiceDecision.confidence,
+            sourceDocumentId: indexed.document.id,
+            createdAt: new Date().toISOString(),
+          };
           await appendBillRecord(billRecord);
         } else {
+          // No amount found — remove the indexed document so it doesn't show in documents list
           await removeDocument({ docId: indexed.document.id, userId });
           return NextResponse.json({
             status: "skipped",
@@ -470,6 +426,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       status: "indexed",
       document_id: indexed.document.id,
+      user_id: indexed.document.userId,
       service_name: indexed.document.serviceName,
       category: categoryHint,
       doc_type: indexed.document.docType,

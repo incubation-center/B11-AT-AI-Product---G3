@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUserId } from "@/lib/get-authenticated-user-id";
 import { readBillRecords } from "@/lib/ai/rag-core";
 
 type ServicesRequest = {
-  user_id?: string;
+  days?: number;
 };
 
 type ServiceSummary = {
@@ -25,16 +24,6 @@ function parseDate(value: string | null): Date | null {
   return parsed;
 }
 
-async function resolveUserId(bodyUserId?: string): Promise<string | null> {
-  if (bodyUserId) return bodyUserId;
-
-  const hdrs = await headers();
-  const headerUserId = hdrs.get("x-user-id");
-  if (headerUserId) return headerUserId;
-
-  const session = await auth.api.getSession({ headers: hdrs });
-  return session?.user?.id ?? null;
-}
 
 function buildServiceSummary(params: {
   bills: Awaited<ReturnType<typeof readBillRecords>>;
@@ -82,30 +71,22 @@ function buildServiceSummary(params: {
 }
 
 async function handle(userInput: ServicesRequest) {
-  const userId = await resolveUserId(userInput.user_id);
+  const userId = await getAuthenticatedUserId();
   if (!userId) {
-    return NextResponse.json(
-      {
-        error: "user_id is required (body/query, x-user-id header, or authenticated session)",
-      },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const bills = await readBillRecords();
   const items = buildServiceSummary({ bills, userId });
 
   return NextResponse.json({
-    user_id: userId,
     count: items.length,
     items,
   });
 }
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const user_id = searchParams.get("user_id") ?? undefined;
-  return handle({ user_id });
+export async function GET() {
+  return handle({});
 }
 
 export async function POST(request: Request) {

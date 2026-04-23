@@ -123,7 +123,7 @@ export default function DashboardDocumentsPanel({
       </div>
 
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[980px] text-left text-sm">
+        <table className="w-full min-w-245 text-left text-sm">
           <thead>
             <tr className="border-b border-[hsl(var(--line))] text-[hsl(var(--muted-ink))]">
               <th className="py-2 font-medium">Service</th>

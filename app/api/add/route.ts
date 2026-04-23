@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUserId } from "@/lib/get-authenticated-user-id";
 import {
   appendBillRecord,
   parseLikelyDate,
@@ -11,7 +10,6 @@ import { getPlanForUser } from "@/lib/user-plan";
 import { canAddBill, PLANS } from "@/lib/plans";
 
 type AddBody = {
-  user_id?: string;
   service_name?: string;
   amount?: number;
   due_date?: string | null;
@@ -21,17 +19,6 @@ type AddBody = {
 };
 
 export const dynamic = "force-dynamic";
-
-async function resolveUserId(bodyUserId?: string): Promise<string | null> {
-  if (bodyUserId) return bodyUserId;
-
-  const hdrs = await headers();
-  const headerUserId = hdrs.get("x-user-id");
-  if (headerUserId) return headerUserId;
-
-  const session = await auth.api.getSession({ headers: hdrs });
-  return session?.user?.id ?? null;
-}
 
 function parseAmount(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {
@@ -52,16 +39,14 @@ function normalizeInvoiceType(value: unknown): InvoiceType {
 
 export async function POST(request: Request) {
   try {
+    const userId = await getAuthenticatedUserId();
     const body = (await request.json()) as AddBody;
-    const userId = await resolveUserId(body.user_id);
     const serviceName = body.service_name?.trim();
     const amount = parseAmount(body.amount);
 
     if (!userId) {
       return NextResponse.json(
-        {
-          error: "user_id is required (body, x-user-id header, or authenticated session)",
-        },
+        { error: "Unauthorized" },
         { status: 401 },
       );
     }

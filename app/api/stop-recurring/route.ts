@@ -9,12 +9,8 @@ export async function POST(request: Request) {
   try {
     const hdrs = await headers();
     const session = await auth.api.getSession({ headers: hdrs });
-    const body = (await request.json()) as { bill_id?: string; user_id?: string };
-
-    const userId =
-      body.user_id ??
-      hdrs.get("x-user-id") ??
-      session?.user?.id;
+    const userId = session?.user?.id;
+    const body = (await request.json()) as { bill_id?: string };
 
     if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
