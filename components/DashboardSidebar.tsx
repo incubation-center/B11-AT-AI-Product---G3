@@ -80,7 +80,7 @@ export default function DashboardSidebar({
   }
 
   return (
-    <nav className="rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface)/0.9)] p-3 shadow-sm lg:h-full lg:rounded-none lg:border-0 lg:bg-transparent lg:p-5 lg:shadow-none">
+    <nav className="flex flex-col rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--surface)/0.9)] p-3 shadow-sm lg:h-full lg:rounded-none lg:border-0 lg:bg-transparent lg:p-5 lg:shadow-none">
       {/* Header */}
       <div className="-mx-3 -mt-3 mb-4 overflow-hidden lg:-mx-5 lg:-mt-5 lg:mb-5">
         <div className="relative bg-linear-to-br from-blue-600 via-blue-500 to-cyan-500 px-5 py-5">
@@ -146,10 +146,10 @@ export default function DashboardSidebar({
       </div>
 
       {/* Sign out */}
-      <div className="mt-4 border-t border-[hsl(var(--line))] pt-4">
+      <div className="mt-4 border-t border-[hsl(var(--line))] pt-4 lg:mt-auto">
         <button
           onClick={handleSignOut}
-          className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm text-[hsl(var(--ink))] transition hover:bg-[hsl(var(--bg)/0.9)] hover:text-red-500 outlines:variant-destructive focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40"
+          className="flex w-full items-center justify-between rounded-xl border border-red-500/60 px-3 py-2.5 text-sm font-medium text-red-600 transition hover:border-red-500 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--surface))] dark:text-red-400"
         >
           <span>Sign Out</span>
           <LogOut className="h-4 w-4 shrink-0" />

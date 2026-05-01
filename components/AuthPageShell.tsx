@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ShieldCheck, Bell, TrendingDown, RefreshCw } from "lucide-react";
-import { ModeToggle } from "@/components/mode-toggle";
 
 type AuthPageShellProps = {
   title: string;
@@ -27,11 +26,6 @@ export default function AuthPageShell({
             backgroundSize: "60px 60px",
           }}
         />
-      </div>
-
-      {/* Theme toggle */}
-      <div className="absolute right-4 top-4 z-20">
-        <ModeToggle />
       </div>
 
       <div className="relative z-10 flex min-h-screen">

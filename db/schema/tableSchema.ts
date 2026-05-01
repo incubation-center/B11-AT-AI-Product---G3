@@ -352,6 +352,19 @@ import { user } from "./users";
     }),
   );
 
+  export const userPlansTable = pgTable(
+    "user_plans",
+    {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: text("user_id").notNull().unique().references(() => user.id, { onDelete: "cascade" }),
+      plan: varchar("plan", { length: 20 }).notNull().default("free"),
+      updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+    },
+    (table) => ({
+      userIdIdx: index("user_plans_user_id_idx").on(table.userId),
+    }),
+  );
+
   export const reminderDeliveryLogsTable = pgTable(
     "reminder_delivery_logs",
     {

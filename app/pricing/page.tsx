@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -54,7 +54,7 @@ const PLANS: {
   {
     key: "pro",
     label: "Pro",
-    price: "$19",
+    price: "$0.10",
     period: "/ month",
     maxBills: "Unlimited bills",
     highlight: true,
@@ -71,11 +71,28 @@ const PLANS: {
   },
 ];
 
+type QRModal = {
+  plan: Plan;
+  qrImageUrl: string;
+  transactionId: string;
+  amount: string;
+  expiresIn: number;
+};
+
+const PLAN_RANK: Record<Plan, number> = { free: 0, basic: 1, pro: 2 };
+
+function isDowngrade(current: Plan, next: Plan) {
+  return PLAN_RANK[next] < PLAN_RANK[current];
+}
+
 export default function PricingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState<Plan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentPlan, setCurrentPlan] = useState<Plan | null>(null);
+  const [qrModal, setQrModal] = useState<QRModal | null>(null);
+  const [pollStatus, setPollStatus] = useState<"waiting" | "confirmed" | "expired">("waiting");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetch("/api/user/plan")
@@ -86,7 +103,48 @@ export default function PricingPage() {
       .catch(() => null);
   }, []);
 
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  function startPolling(transactionId: string, plan: Plan, expiresIn: number) {
+    stopPolling();
+    const deadline = Date.now() + expiresIn * 1000;
+
+    pollRef.current = setInterval(async () => {
+      if (Date.now() > deadline) {
+        stopPolling();
+        setPollStatus("expired");
+        return;
+      }
+      try {
+        const res = await fetch("/api/khpay/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transactionId, plan }),
+        });
+        const json = (await res.json()) as { confirmed?: boolean };
+        if (json.confirmed) {
+          stopPolling();
+          setPollStatus("confirmed");
+          setTimeout(() => {
+            router.push(`/settings?upgraded=${plan}`);
+          }, 1500);
+        }
+      } catch {
+        // keep polling
+      }
+    }, 10000);
+  }
+
   async function selectPlan(plan: Plan) {
+    if (currentPlan && isDowngrade(currentPlan, plan)) {
+      setError("To downgrade your plan, please contact us at soengsokheng096@gmail.com.");
+      return;
+    }
     setLoading(plan);
     setError(null);
     try {
@@ -105,24 +163,35 @@ export default function PricingPage() {
         return;
       }
 
-      // Paid plans → Stripe Checkout
-      const res = await fetch("/api/stripe/checkout", {
+      // Paid plans → KHPAY KHQR
+      const res = await fetch("/api/khpay/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
       if (!res.ok) {
         const json = (await res.json()) as { error?: string };
-        setError(json.error ?? "Failed to start checkout.");
+        setError(json.error ?? "Failed to generate QR.");
         return;
       }
-      const { url } = (await res.json()) as { url: string };
-      window.location.href = url;
+      const data = (await res.json()) as { qrImageUrl: string; transactionId: string; amount: string; expiresIn: number };
+      setPollStatus("waiting");
+      setQrModal({ plan, qrImageUrl: data.qrImageUrl, transactionId: data.transactionId, amount: data.amount, expiresIn: data.expiresIn });
+      startPolling(data.transactionId, plan, data.expiresIn);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(null);
     }
+  }
+
+  function closeModal() {
+    stopPolling();
+    if (qrModal) {
+      void fetch(`/api/khpay/expire/${qrModal.transactionId}`, { method: "POST" });
+    }
+    setQrModal(null);
+    setPollStatus("waiting");
   }
 
   return (
@@ -134,7 +203,7 @@ export default function PricingPage() {
             Start free. Upgrade when you need more.
           </p>
           <p className="mt-3 inline-block rounded-full bg-[hsl(var(--warning-soft))] px-4 py-1 text-xs font-medium text-[hsl(var(--warning))]">
-            Test mode — use card <strong>4242 4242 4242 4242</strong>, any future date, any CVC.
+            Pay with KHQR — scan the QR code in your banking app.
           </p>
         </div>
 
@@ -160,7 +229,6 @@ export default function PricingPage() {
                   Most Popular
                 </span>
               )}
-
 
               <div className="mb-6">
                 <p
@@ -235,23 +303,27 @@ export default function PricingPage() {
 
               <button
                 onClick={() => selectPlan(plan.key)}
-                disabled={loading !== null || currentPlan === plan.key}
+                disabled={loading !== null || currentPlan === plan.key || !!(currentPlan && isDowngrade(currentPlan, plan.key))}
                 className={[
-                  "w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-60",
+                  "w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity",
                   currentPlan === plan.key
-                    ? "cursor-default bg-green-500 text-white"
-                    : plan.highlight
-                      ? "bg-white text-[hsl(var(--primary))] hover:opacity-90"
-                      : "bg-[hsl(var(--primary))] text-white hover:opacity-90",
+                    ? "cursor-default bg-green-400 text-white"
+                    : currentPlan && isDowngrade(currentPlan, plan.key)
+                      ? "cursor-not-allowed bg-[hsl(var(--muted-soft))] text-[hsl(var(--muted-ink))] opacity-50"
+                      : plan.highlight
+                        ? "bg-white text-[hsl(var(--primary))] hover:opacity-90"
+                        : "bg-[hsl(var(--primary))] text-white hover:opacity-90",
                 ].join(" ")}
               >
                 {loading === plan.key
-                  ? "Updating…"
+                  ? "Loading…"
                   : currentPlan === plan.key
                     ? "In Use"
-                    : plan.key === "free"
-                      ? "Get Started"
-                      : `Upgrade to ${plan.label}`}
+                    : currentPlan && isDowngrade(currentPlan, plan.key)
+                      ? "Contact us"
+                      : plan.key === "free"
+                        ? "Get Started"
+                        : `Upgrade to ${plan.label}`}
               </button>
             </article>
           ))}
@@ -264,6 +336,71 @@ export default function PricingPage() {
           </Link>
         </p>
       </div>
+
+      {/* QR Payment Modal */}
+      {qrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-[hsl(var(--surface))] p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                Pay ${qrModal.amount} —{" "}
+                {qrModal.plan.charAt(0).toUpperCase() + qrModal.plan.slice(1)} Plan
+              </h2>
+              <button
+                onClick={closeModal}
+                className="rounded-full p-1 text-[hsl(var(--muted-ink))] hover:bg-[hsl(var(--muted-soft))]"
+              >
+                ✕
+              </button>
+            </div>
+
+            {pollStatus === "confirmed" ? (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--success-soft))] text-2xl text-[hsl(var(--success))]">
+                  ✓
+                </span>
+                <p className="font-semibold text-[hsl(var(--success))]">Payment confirmed!</p>
+                <p className="text-sm text-[hsl(var(--muted-ink))]">Redirecting…</p>
+              </div>
+            ) : pollStatus === "expired" ? (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <p className="font-semibold text-[hsl(var(--danger))]">QR code expired.</p>
+                <button
+                  onClick={() => {
+                    closeModal();
+                    void selectPlan(qrModal.plan);
+                  }}
+                  className="rounded-xl bg-[hsl(var(--primary))] px-5 py-2 text-sm font-semibold text-white"
+                >
+                  Generate new QR
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-center rounded-xl bg-white p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={qrModal.qrImageUrl}
+                    alt="KHPAY KHQR payment code"
+                    width={260}
+                    height={260}
+                  />
+                </div>
+                <p className="mt-4 text-center text-sm text-[hsl(var(--muted-ink))]">
+                  Scan with your <strong>Bakong</strong> or banking app
+                </p>
+                <div className="mt-3 flex items-center justify-center gap-2 text-xs text-[hsl(var(--muted-ink))]">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[hsl(var(--primary))]" />
+                  Waiting for payment…
+                </div>
+                <p className="mt-2 text-center text-xs text-[hsl(var(--muted-ink))]">
+                  QR expires in {Math.round(qrModal.expiresIn / 60)} minutes
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
