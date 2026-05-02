@@ -122,7 +122,7 @@ export default function PricingPage() {
         return;
       }
       try {
-        const res = await fetch("/api/bakong/verify", {
+        const res = await fetch("/api/khpay/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ transactionId, plan }),
@@ -165,7 +165,7 @@ export default function PricingPage() {
       }
 
       // Paid plans → KHPAY KHQR
-      const res = await fetch("/api/bakong/checkout", {
+      const res = await fetch("/api/khpay/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
