@@ -36,7 +36,7 @@ const PLANS: {
   {
     key: "basic",
     label: "Basic",
-    price: "$9",
+    price: "$0.10",
     period: "/ month",
     maxBills: "30 active bills",
     highlight: false,
@@ -78,6 +78,7 @@ type QRModal = {
   amount: string;
   expiresIn: number;
 };
+
 
 const PLAN_RANK: Record<Plan, number> = { free: 0, basic: 1, pro: 2 };
 
@@ -121,7 +122,7 @@ export default function PricingPage() {
         return;
       }
       try {
-        const res = await fetch("/api/khpay/verify", {
+        const res = await fetch("/api/bakong/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ transactionId, plan }),
@@ -132,7 +133,7 @@ export default function PricingPage() {
           setPollStatus("confirmed");
           setTimeout(() => {
             router.push(`/settings?upgraded=${plan}`);
-          }, 1500);
+          }, 3000);
         }
       } catch {
         // keep polling
@@ -164,7 +165,7 @@ export default function PricingPage() {
       }
 
       // Paid plans → KHPAY KHQR
-      const res = await fetch("/api/khpay/checkout", {
+      const res = await fetch("/api/bakong/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
@@ -187,9 +188,6 @@ export default function PricingPage() {
 
   function closeModal() {
     stopPolling();
-    if (qrModal) {
-      void fetch(`/api/khpay/expire/${qrModal.transactionId}`, { method: "POST" });
-    }
     setQrModal(null);
     setPollStatus("waiting");
   }

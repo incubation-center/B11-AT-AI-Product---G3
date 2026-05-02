@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Bell, RefreshCw, ShieldCheck, TrendingDown } from "lucide-react";
+import { ArrowRight, Bell, Moon, RefreshCw, ShieldCheck, Sun, TrendingDown } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
 import { authClient } from "@/lib/auth-client";
@@ -12,7 +12,7 @@ import { authClient } from "@/lib/auth-client";
 export default function HomePage() {
   const { data: session } = authClient.useSession();
   const router = useRouter();
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
   useEffect(() => {
@@ -46,6 +46,13 @@ export default function HomePage() {
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <span className="text-2xl font-bold tracking-tight">Duey</span>
         <nav className="flex items-center gap-3">
+          <button
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+            className={`rounded-full p-2 transition ${isDark ? "text-white/60 hover:bg-white/10 hover:text-white" : "text-[#0a0f1e]/60 hover:bg-black/10 hover:text-[#0a0f1e]"}`}
+            aria-label="Toggle theme"
+          >
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           <Link
             href="/sign-in"
             className={`rounded-full px-4 py-2 text-sm transition ${isDark ? "text-white/70 hover:text-white" : "text-[#0a0f1e]/70 hover:text-[#0a0f1e]"}`}

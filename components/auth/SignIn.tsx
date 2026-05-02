@@ -154,7 +154,7 @@ export default function SignIn() {
 
           <Button
             type="submit"
-            className="w-full rounded-md bg-accent text-accent-foreground transition hover:opacity-90"
+            className="w-full rounded-md bg-[hsl(var(--primary))] text-accent-foreground transition hover:opacity-90 cursor-pointer"
             disabled={isLoading}
           >
             {isLoading ? "Signing in..." : "Sign In"}
@@ -170,7 +170,7 @@ export default function SignIn() {
         
           <Button
             variant="outline"
-            className="w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:bg-slate-800"
+            className="w-full border-slate-300 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 cursor-pointer"
             onClick={handleGoogleSignIn}
             disabled={isLoading}
           >

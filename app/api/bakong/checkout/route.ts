@@ -7,7 +7,7 @@ import QRCode from "qrcode";
 export const dynamic = "force-dynamic";
 
 const PLAN_AMOUNTS: Record<string, number> = {
-  basic: 9,
+  basic: 0.10,
   pro: 0.10,
 };
 
@@ -32,7 +32,6 @@ export async function POST(request: Request) {
     const info = new IndividualInfo(accountId, merchantName, "Phnom Penh");
     info.currency = khqrData.currency.usd;
     info.amount = amount;
-    // QR expires in 15 minutes
     info.expirationTimestamp = String(Date.now() + 15 * 60 * 1000);
 
     const generator = new BakongKHQR();
@@ -45,24 +44,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const qrDataUrl = await QRCode.toDataURL(result.data.qr, {
-      width: 280,
-      margin: 2,
-    });
+    const qrImageUrl = await QRCode.toDataURL(result.data.qr, { width: 280, margin: 2 });
 
     return NextResponse.json({
-      qrDataUrl,
-      md5: result.data.md5,
+      transactionId: result.data.md5,
+      qrImageUrl,
       amount,
       plan,
-      userId: session.user.id,
+      expiresIn: 15 * 60,
     });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: "checkout_failed",
-        detail: error instanceof Error ? error.message : "unknown_error",
-      },
+      { error: "checkout_failed", detail: error instanceof Error ? error.message : "unknown" },
       { status: 500 },
     );
   }

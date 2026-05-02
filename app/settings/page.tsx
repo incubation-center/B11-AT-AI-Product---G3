@@ -22,7 +22,12 @@ function formatDateTime(value: string): string {
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ upgraded?: string }>;
+}) {
+  const { upgraded } = await searchParams;
   const data = await getWorkspaceData();
   const [dueReminderEmailEnabled, reminderHistory, telegramLink] = await Promise.all([
     getDueReminderEmailEnabledForUser(data.userId),
@@ -39,6 +44,18 @@ export default async function SettingsPage() {
       userName={data.session.user.name || "User"}
       sidebarCounts={data.sidebarCounts}
     >
+      {upgraded && (
+        <div className="mb-6 rounded-2xl border border-[hsl(var(--success))] bg-[hsl(var(--success-soft))] px-5 py-4">
+          <p className="font-semibold text-[hsl(var(--success))]">
+            Payment confirmed — you&apos;re now on the{" "}
+            {upgraded.charAt(0).toUpperCase() + upgraded.slice(1)} plan!
+          </p>
+          <p className="mt-1 text-sm text-[hsl(var(--success))]">
+            All features are now active on your account.
+          </p>
+        </div>
+      )}
+
       <PlanUsageCard
         plan={data.userPlan}
         planConfig={data.planConfig}
