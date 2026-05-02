@@ -40,6 +40,11 @@ export async function POST(request: Request) {
       cache: "no-store",
     });
 
+    if (!res.ok || !res.headers.get("content-type")?.includes("application/json")) {
+      const text = await res.text();
+      return NextResponse.json({ error: "khpay_unreachable", status: res.status, _debug: text.slice(0, 300) }, { status: 502 });
+    }
+
     const data = (await res.json()) as {
       success: boolean;
       data?: {
