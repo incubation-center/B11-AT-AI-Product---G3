@@ -4,6 +4,13 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+const generateDeviceId = () => {
+  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => characters[byte % characters.length]).join("");
+};
+
 type Plan = "free" | "basic" | "pro";
 
 const PLANS: {
@@ -36,7 +43,7 @@ const PLANS: {
   {
     key: "basic",
     label: "Basic",
-    price: "$0.10",
+    price: "$0.01",
     period: "/ month",
     maxBills: "30 active bills",
     highlight: false,
@@ -54,7 +61,7 @@ const PLANS: {
   {
     key: "pro",
     label: "Pro",
-    price: "$0.10",
+    price: "$0.01",
     period: "/ month",
     maxBills: "Unlimited bills",
     highlight: true,
@@ -73,18 +80,15 @@ const PLANS: {
 
 type QRModal = {
   plan: Plan;
-  qrImageUrl: string;
-  transactionId: string;
-  amount: string;
-  expiresIn: number;
+  downloadQr: string;
+  clientId: string;
+  requestTime: string;
+  token: string;
+  deviceId: string;
+  expireInSec: number;
 };
 
 
-const PLAN_RANK: Record<Plan, number> = { free: 0, basic: 1, pro: 2 };
-
-function isDowngrade(current: Plan, next: Plan) {
-  return PLAN_RANK[next] < PLAN_RANK[current];
-}
 
 export default function PricingPage() {
   const router = useRouter();
@@ -111,9 +115,9 @@ export default function PricingPage() {
     }
   }
 
-  function startPolling(transactionId: string, plan: Plan, expiresIn: number) {
+  function startPolling(modal: QRModal) {
     stopPolling();
-    const deadline = Date.now() + expiresIn * 1000;
+    const deadline = Date.now() + modal.expireInSec * 1000;
 
     pollRef.current = setInterval(async () => {
       if (Date.now() > deadline) {
@@ -122,30 +126,36 @@ export default function PricingPage() {
         return;
       }
       try {
-        const res = await fetch("/api/khpay/verify", {
+        const res = await fetch("/api/payway/status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transactionId, plan }),
+          body: JSON.stringify({
+            client_id: modal.clientId,
+            device_id: modal.deviceId,
+            request_time: modal.requestTime,
+            token: modal.token,
+            plan: modal.plan,
+          }),
         });
         const json = (await res.json()) as { confirmed?: boolean };
         if (json.confirmed) {
           stopPolling();
           setPollStatus("confirmed");
           setTimeout(() => {
-            router.push(`/settings?upgraded=${plan}`);
+            router.push(`/settings?upgraded=${modal.plan}`);
           }, 3000);
         }
       } catch {
         // keep polling
       }
-    }, 10000);
+    }, 5000);
   }
 
   async function selectPlan(plan: Plan) {
-    if (currentPlan && isDowngrade(currentPlan, plan)) {
-      setError("To downgrade your plan, please contact us at soengsokheng096@gmail.com.");
-      return;
-    }
+    // if (currentPlan && isDowngrade(currentPlan, plan)) {
+    //   setError("To downgrade your plan, please contact us at soengsokheng096@gmail.com.");
+    //   return;
+    // }
     setLoading(plan);
     setError(null);
     try {
@@ -164,8 +174,8 @@ export default function PricingPage() {
         return;
       }
 
-      // Paid plans → KHPAY KHQR
-      const res = await fetch("/api/khpay/checkout", {
+      // Paid plans → ABA PayWay
+      const res = await fetch("/api/payway/init", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
@@ -175,10 +185,25 @@ export default function PricingPage() {
         setError(json.error ?? "Failed to generate QR.");
         return;
       }
-      const data = (await res.json()) as { qrImageUrl: string; transactionId: string; amount: string; expiresIn: number };
+      const data = (await res.json()) as {
+        download_qr: string;
+        client_id: string;
+        request_time: string;
+        token: string;
+        expire_in_sec: number;
+      };
+      const modal: QRModal = {
+        plan,
+        downloadQr: data.download_qr,
+        clientId: data.client_id,
+        requestTime: data.request_time,
+        token: data.token,
+        deviceId: generateDeviceId(),
+        expireInSec: data.expire_in_sec,
+      };
       setPollStatus("waiting");
-      setQrModal({ plan, qrImageUrl: data.qrImageUrl, transactionId: data.transactionId, amount: data.amount, expiresIn: data.expiresIn });
-      startPolling(data.transactionId, plan, data.expiresIn);
+      setQrModal(modal);
+      startPolling(modal);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -201,7 +226,7 @@ export default function PricingPage() {
             Start free. Upgrade when you need more.
           </p>
           <p className="mt-3 inline-block rounded-full bg-[hsl(var(--warning-soft))] px-4 py-1 text-xs font-medium text-[hsl(var(--warning))]">
-            Pay with KHQR — scan the QR code in your banking app.
+            Pay with ABA PayWay — scan the QR code in your ABA app.
           </p>
         </div>
 
@@ -301,27 +326,23 @@ export default function PricingPage() {
 
               <button
                 onClick={() => selectPlan(plan.key)}
-                disabled={loading !== null || currentPlan === plan.key || !!(currentPlan && isDowngrade(currentPlan, plan.key))}
+                disabled={loading !== null || currentPlan === plan.key}
                 className={[
                   "w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity",
                   currentPlan === plan.key
                     ? "cursor-default bg-green-400 text-white"
-                    : currentPlan && isDowngrade(currentPlan, plan.key)
-                      ? "cursor-not-allowed bg-[hsl(var(--muted-soft))] text-[hsl(var(--muted-ink))] opacity-50"
-                      : plan.highlight
-                        ? "bg-white text-[hsl(var(--primary))] hover:opacity-90"
-                        : "bg-[hsl(var(--primary))] text-white hover:opacity-90",
+                    : plan.highlight
+                      ? "bg-white text-[hsl(var(--primary))] hover:opacity-90"
+                      : "bg-[hsl(var(--primary))] text-white hover:opacity-90",
                 ].join(" ")}
               >
                 {loading === plan.key
                   ? "Loading…"
                   : currentPlan === plan.key
                     ? "In Use"
-                    : currentPlan && isDowngrade(currentPlan, plan.key)
-                      ? "Contact us"
-                      : plan.key === "free"
-                        ? "Get Started"
-                        : `Upgrade to ${plan.label}`}
+                    : plan.key === "free"
+                      ? "Get Started"
+                      : `Upgrade to ${plan.label}`}
               </button>
             </article>
           ))}
@@ -341,7 +362,6 @@ export default function PricingPage() {
           <div className="w-full max-w-sm rounded-2xl bg-[hsl(var(--surface))] p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">
-                Pay ${qrModal.amount} —{" "}
                 {qrModal.plan.charAt(0).toUpperCase() + qrModal.plan.slice(1)} Plan
               </h2>
               <button
@@ -378,21 +398,21 @@ export default function PricingPage() {
                 <div className="flex justify-center rounded-xl bg-white p-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={qrModal.qrImageUrl}
-                    alt="KHPAY KHQR payment code"
+                    src={qrModal.downloadQr}
+                    alt="ABA PayWay QR payment code"
                     width={260}
                     height={260}
                   />
                 </div>
                 <p className="mt-4 text-center text-sm text-[hsl(var(--muted-ink))]">
-                  Scan with your <strong>Bakong</strong> or banking app
+                  Scan with your <strong>ABA</strong> or banking app
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-2 text-xs text-[hsl(var(--muted-ink))]">
                   <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[hsl(var(--primary))]" />
                   Waiting for payment…
                 </div>
                 <p className="mt-2 text-center text-xs text-[hsl(var(--muted-ink))]">
-                  QR expires in {Math.round(qrModal.expiresIn / 60)} minutes
+                  QR expires in {Math.round(qrModal.expireInSec / 60)} minutes
                 </p>
               </>
             )}
