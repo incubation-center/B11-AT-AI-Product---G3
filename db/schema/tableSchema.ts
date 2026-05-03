@@ -365,6 +365,19 @@ import { user } from "./users";
     }),
   );
 
+  export const userNotificationPreferencesTable = pgTable(
+    "user_notification_preferences",
+    {
+      id: uuid("id").primaryKey().defaultRandom(),
+      userId: text("user_id").notNull().unique().references(() => user.id, { onDelete: "cascade" }),
+      dueReminderEmailEnabled: boolean("due_reminder_email_enabled").notNull().default(true),
+      updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+    },
+    (table) => ({
+      userIdIdx: index("user_notification_preferences_user_id_idx").on(table.userId),
+    }),
+  );
+
   export const reminderDeliveryLogsTable = pgTable(
     "reminder_delivery_logs",
     {
