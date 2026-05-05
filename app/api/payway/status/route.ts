@@ -1,7 +1,6 @@
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUserId } from "@/lib/get-authenticated-user-id";
 import { setPlanForUser } from "@/lib/user-plan";
 import type { Plan } from "@/lib/plans";
 
@@ -12,9 +11,8 @@ const paywayStatusUrl =
 
 export const POST = async (request: Request) => {
   try {
-    const hdrs = await headers();
-    const session = await auth.api.getSession({ headers: hdrs });
-    if (!session?.user) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
@@ -32,15 +30,13 @@ export const POST = async (request: Request) => {
     const token = typeof body.token === "string" ? body.token.trim() : "";
     const plan = typeof body.plan === "string" ? body.plan.trim() : "";
 
-    if (!clientId || !deviceId || !requestTime || !token) {
+    if (!clientId || !deviceId || !requestTime || !token || !plan) {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
 
     const hash = createHash("sha512")
       .update(clientId + deviceId + requestTime)
       .digest("hex");
-
-    console.log("[payway/status] sending → clientId:", clientId, "| deviceId:", deviceId, "| requestTime:", requestTime, "| hash:", hash.slice(0, 20) + "...");
 
     const paywayResponse = await fetch(paywayStatusUrl, {
       method: "POST",
@@ -68,9 +64,7 @@ export const POST = async (request: Request) => {
       return NextResponse.json({ confirmed: false }, { status: 200 });
     }
 
-    if (plan) {
-      await setPlanForUser(session.user.id, plan as Plan);
-    }
+    await setPlanForUser(userId, plan as Plan);
 
     return NextResponse.json({ confirmed: true });
   } catch (error) {

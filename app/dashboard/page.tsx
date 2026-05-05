@@ -84,7 +84,7 @@ export default async function DashboardPage() {
             </li>
           </ol>
           <Link
-            href="/documents"
+            href="/upload"
             className="mt-5 inline-block rounded-xl bg-[hsl(var(--primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
           >
             Upload your first document

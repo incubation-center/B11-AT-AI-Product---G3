@@ -147,6 +147,7 @@ export async function POST(request: Request) {
           new Date().toISOString().slice(0, 10),
         dueDate: parseLikelyDate(body.due_date ?? ""),
         amount: currentAmount,
+        currency: "USD",
         usage:
           typeof body.current_usage === "number" ? body.current_usage : null,
         isRecurring: invoiceType === "recurring",

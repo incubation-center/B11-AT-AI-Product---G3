@@ -5,6 +5,8 @@ import {
 } from "@/lib/cheaper-feedback";
 import type { BillRecord } from "@/lib/ai/rag-core";
 
+const KHR_TO_USD = 1 / 4100;
+
 export type AlternativeRisk = "low" | "medium" | "high";
 
 export type ServiceCategory =
@@ -187,8 +189,9 @@ export function buildCheaperAlternativeOpportunities(
   for (const [serviceKey, serviceBills] of billsByService) {
     const displayName = serviceBills[0]?.serviceName ?? serviceKey;
     const sorted = [...serviceBills].sort((a, b) => b.billDate.localeCompare(a.billDate));
-    const latestAmount = sorted[0]?.amount ?? 0;
-    const currentMonthly = latestAmount > 0 ? latestAmount : avg(serviceBills.map((b) => b.amount));
+    const toUsd = (b: BillRecord) => b.currency === "KHR" ? b.amount * KHR_TO_USD : b.amount;
+    const latestAmount = toUsd(sorted[0]!);
+    const currentMonthly = latestAmount > 0 ? latestAmount : avg(serviceBills.map(toUsd));
     if (currentMonthly < 3) continue;
 
     const category = inferCategory(displayName, hintByService.get(serviceKey) ?? null);

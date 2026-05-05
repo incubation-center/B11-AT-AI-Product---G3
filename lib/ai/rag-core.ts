@@ -2,7 +2,7 @@ import { randomUUID, createHash } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import OpenAI from "openai";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "@/db/drizzle";
 import { billsTable, contractsTable } from "@/db/schema/tableSchema";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -56,6 +56,7 @@ export type BillRecord = {
   billDate: string;
   dueDate: string | null;
   amount: number;
+  currency: "USD" | "KHR";
   usage: number | null;
   isRecurring: boolean;
   invoiceType: InvoiceType;
@@ -167,7 +168,7 @@ async function persistBillToDb(record: BillRecord) {
     userId: normalized.userId,
     serviceName: normalized.serviceName,
     amount: normalized.amount.toFixed(2),
-    currency: "USD",
+    currency: normalized.currency,
     billDate: new Date(normalized.billDate),
     dueDate: normalized.dueDate ? new Date(normalized.dueDate) : null,
     usage: typeof normalized.usage === "number" ? normalized.usage.toFixed(2) : null,
@@ -314,6 +315,7 @@ function normalizeBillRecord(record: BillRecord): BillRecord {
   return {
     ...record,
     dueDate: typeof record.dueDate === "string" ? record.dueDate : null,
+    currency: record.currency === "KHR" ? "KHR" : "USD",
     usage: typeof record.usage === "number" ? record.usage : null,
     isRecurring: invoiceType === "recurring",
     invoiceType,
@@ -354,6 +356,7 @@ export async function readBillRecords(): Promise<BillRecord[]> {
         classificationReason: (meta.classificationReason as string) ?? null,
         classificationEvidence: (meta.classificationEvidence as string[]) ?? [],
         classificationConfidence: (meta.classificationConfidence as number) ?? null,
+        currency: row.currency === "KHR" ? "KHR" : "USD",
         sourceDocumentId: row.sourceDocumentId ?? null,
         createdAt: row.createdAt.toISOString(),
       });
@@ -842,6 +845,48 @@ function rerank(
     .sort((a, b) => b.score - a.score);
 }
 
+function termOverlap(query: string, text: string): number {
+  const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+  if (terms.length === 0) return 0.3;
+  const lower = text.toLowerCase();
+  return terms.filter((t) => lower.includes(t)).length / terms.length;
+}
+
+async function searchInDbRawText(params: {
+  query: string;
+  topK?: number;
+  userId?: string;
+  documentId: string;
+}): Promise<Array<VectorChunk & { score: number }>> {
+  const row = await db
+    .select({ rawText: contractsTable.rawText, serviceName: contractsTable.serviceName, docType: contractsTable.docType })
+    .from(contractsTable)
+    .where(and(eq(contractsTable.id, params.documentId), params.userId ? eq(contractsTable.userId, params.userId) : undefined))
+    .limit(1)
+    .then((r) => r[0]);
+
+  if (!row?.rawText) return [];
+
+  const chunks = splitTextIntoChunks(row.rawText);
+  const now = new Date().toISOString();
+  return chunks
+    .map((text, index) => ({
+      id: `db-${params.documentId}-${index}`,
+      documentId: params.documentId,
+      userId: params.userId ?? "",
+      serviceName: row.serviceName ?? null,
+      categoryHint: null,
+      docType: (row.docType as DocType) ?? "bill",
+      chunkIndex: index,
+      text,
+      embedding: [] as number[],
+      createdAt: now,
+      score: Math.max(0.3, termOverlap(params.query, text)),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, params.topK ?? 5);
+}
+
 export async function semanticSearch(params: {
   query: string;
   topK?: number;
@@ -850,6 +895,10 @@ export async function semanticSearch(params: {
   serviceName?: string;
   docType?: DocType;
 }): Promise<Array<VectorChunk & { score: number }>> {
+  if (USE_DB && params.documentId) {
+    return searchInDbRawText({ ...params, documentId: params.documentId });
+  }
+
   const store = await readStore();
   const queryVector = await embedText(params.query);
   let filtered = store.chunks;

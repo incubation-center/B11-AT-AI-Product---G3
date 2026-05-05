@@ -14,6 +14,27 @@ import { buildCheaperAlternativeOpportunities } from "@/lib/billing-alternatives
 export type { DueReminder } from "@/lib/billing-reminders";
 export type { CheaperAlternativeOpportunity } from "@/lib/billing-alternatives";
 
+const NULLISH_SERVICE_NAMES = new Set(["null", "unknown", "undefined", "n/a", "none"]);
+
+function normalizeDocumentServiceName(
+  serviceName: string | null,
+  originalFilename: string | null,
+): string | null {
+  const trimmed = serviceName?.trim();
+  if (!trimmed || NULLISH_SERVICE_NAMES.has(trimmed.toLowerCase())) return null;
+
+  const filename = originalFilename?.trim().toLowerCase();
+  if (
+    filename &&
+    trimmed.toLowerCase() === filename &&
+    /\.[a-z0-9]{2,5}$/i.test(filename)
+  ) {
+    return null;
+  }
+
+  return trimmed;
+}
+
 export async function getWorkspaceData() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/sign-in");
@@ -30,7 +51,10 @@ export async function getWorkspaceData() {
           rows.map((row): DocumentRecord => ({
             id: row.id,
             userId: row.userId,
-            serviceName: row.serviceName ?? null,
+            serviceName: normalizeDocumentServiceName(
+              row.serviceName ?? null,
+              row.originalFilename ?? null,
+            ),
             categoryHint: row.category ?? null,
             docType: (row.docType as DocumentRecord["docType"]) ?? "contract",
             originalFilename: row.originalFilename ?? "",

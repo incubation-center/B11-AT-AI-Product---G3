@@ -1,7 +1,6 @@
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUserId } from "@/lib/get-authenticated-user-id";
 
 export const dynamic = "force-dynamic";
 
@@ -31,9 +30,8 @@ const extractPaywayState = (html: string) => {
 
 export const POST = async (request: Request) => {
   try {
-    const hdrs = await headers();
-    const session = await auth.api.getSession({ headers: hdrs });
-    if (!session?.user) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
@@ -69,7 +67,6 @@ export const POST = async (request: Request) => {
     });
 
     const paymentData = (await paywayResponse.json()) as Record<string, unknown>;
-    console.log("[payway/init] HTTP:", paywayResponse.status, "body:", JSON.stringify(paymentData));
 
     if (!paywayResponse.ok) {
       return NextResponse.json(paymentData, { status: paywayResponse.status });

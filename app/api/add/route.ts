@@ -12,6 +12,7 @@ import { canAddBill, PLANS } from "@/lib/plans";
 type AddBody = {
   service_name?: string;
   amount?: number;
+  currency?: string;
   due_date?: string | null;
   bill_date?: string;
   usage?: number | null;
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
       billDate,
       dueDate,
       amount,
+      currency: body.currency === "KHR" ? "KHR" as const : "USD" as const,
       usage: typeof body.usage === "number" ? body.usage : null,
       isRecurring: invoiceType === "recurring",
       invoiceType,

@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import type { Plan } from "@/lib/plans";
+
 
 const generateDeviceId = () => {
   const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -11,9 +13,7 @@ const generateDeviceId = () => {
   return Array.from(bytes, (byte) => characters[byte % characters.length]).join("");
 };
 
-type Plan = "free" | "basic" | "pro";
-
-const PLANS: {
+const PRICING_CARDS: {
   key: Plan;
   label: string;
   price: string;
@@ -225,9 +225,6 @@ export default function PricingPage() {
           <p className="mt-3 text-[hsl(var(--muted-ink))]">
             Start free. Upgrade when you need more.
           </p>
-          <p className="mt-3 inline-block rounded-full bg-[hsl(var(--warning-soft))] px-4 py-1 text-xs font-medium text-[hsl(var(--warning))]">
-            Pay with ABA PayWay — scan the QR code in your ABA app.
-          </p>
         </div>
 
         {error && (
@@ -237,7 +234,7 @@ export default function PricingPage() {
         )}
 
         <div className="grid gap-6 md:grid-cols-3">
-          {PLANS.map((plan) => (
+          {PRICING_CARDS.map((plan) => (
             <article
               key={plan.key}
               className={[

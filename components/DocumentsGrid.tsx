@@ -58,6 +58,31 @@ type ExtractResult = {
   evidence: string[];
 };
 
+const NULL_SERVICE_NAMES = new Set(["null", "unknown", "undefined", "n/a", "none"]);
+
+function normalizeServiceName(doc: DocRecord): string | null {
+  const name = doc.serviceName?.trim();
+  if (!name) return null;
+
+  const lower = name.toLowerCase();
+  if (NULL_SERVICE_NAMES.has(lower)) return null;
+
+  const filename = doc.originalFilename?.trim().toLowerCase();
+  if (filename && lower === filename && /\.[a-z0-9]{2,5}$/i.test(filename)) {
+    return null;
+  }
+
+  return name;
+}
+
+function resolveDocName(doc: DocRecord, receiptIndex: number | null): string {
+  const name = normalizeServiceName(doc);
+  if (!name) {
+    return receiptIndex ? `Receipt ${receiptIndex}` : "Receipt";
+  }
+  return name;
+}
+
 function getInvoiceTypeLabel(bill: BillRec | null): string {
   if (!bill) {
     return "Invoice / Bill";
@@ -88,19 +113,24 @@ export default function DocumentsGrid({
   const [selected, setSelected] = useState<DocRecord | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   async function handleDelete(docId: string) {
     setDeletingId(docId);
+    setDeleteError("");
     try {
       const res = await fetch(`/api/documents/${docId}?user_id=${userId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Delete failed");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.detail ?? data?.error ?? "Delete failed");
+      }
       setConfirmId(null);
       router.refresh();
-    } catch {
-      // silently reset on failure
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Delete failed");
     } finally {
       setDeletingId(null);
     }
@@ -128,6 +158,18 @@ export default function DocumentsGrid({
     b.createdAt.localeCompare(a.createdAt),
   );
 
+  const receiptIndexMap = new Map<string, number>();
+  let receiptCounter = 0;
+  const receiptNumberOrder = [...documents].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  );
+  for (const doc of receiptNumberOrder) {
+    if (!normalizeServiceName(doc)) {
+      receiptCounter += 1;
+      receiptIndexMap.set(doc.id, receiptCounter);
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE));
   const paged = sorted.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -144,6 +186,7 @@ export default function DocumentsGrid({
             bill?.dueDate &&
             !isOverdue &&
             new Date(bill.dueDate).getTime() - nowMs < 7 * 24 * 60 * 60 * 1000;
+          const displayName = resolveDocName(doc, receiptIndexMap.get(doc.id) ?? null);
 
           return (
             <div
@@ -174,10 +217,10 @@ export default function DocumentsGrid({
               {/* Name + filename */}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">
-                  {doc.serviceName ?? doc.originalFilename}
+                  {displayName}
                 </p>
                 <p className="truncate text-xs text-[hsl(var(--muted-ink))]">
-                  {doc.serviceName ? doc.originalFilename : `Uploaded ${new Date(doc.createdAt).toLocaleDateString()}`}
+                  {doc.originalFilename || `Uploaded ${new Date(doc.createdAt).toLocaleDateString()}`}
                 </p>
               </div>
 
@@ -217,6 +260,11 @@ export default function DocumentsGrid({
               <div className="flex items-center gap-1 shrink-0">
                 {confirmId === doc.id ? (
                   <>
+                    {deleteError && (
+                      <p className="max-w-40 truncate text-xs text-red-600">
+                        {deleteError}
+                      </p>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
                       disabled={deletingId === doc.id}
@@ -225,7 +273,7 @@ export default function DocumentsGrid({
                       {deletingId === doc.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Delete"}
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); setConfirmId(null); }}
+                      onClick={(e) => { e.stopPropagation(); setConfirmId(null); setDeleteError(""); }}
                       className="rounded-md px-2 py-1 text-xs text-[hsl(var(--muted-ink))] hover:bg-[hsl(var(--bg))]"
                     >
                       Cancel
@@ -233,7 +281,7 @@ export default function DocumentsGrid({
                   </>
                 ) : (
                   <button
-                    onClick={(e) => { e.stopPropagation(); setConfirmId(doc.id); }}
+                    onClick={(e) => { e.stopPropagation(); setConfirmId(doc.id); setDeleteError(""); }}
                     className="rounded-lg p-1.5 text-[hsl(var(--muted-ink))] opacity-0 group-hover:opacity-100 transition hover:bg-red-500/10 hover:text-red-500"
                     aria-label="Delete document"
                   >
@@ -282,6 +330,7 @@ export default function DocumentsGrid({
         <DocumentDetailModal
           doc={selected}
           bill={billByDocId.get(selected.id) ?? null}
+          receiptIndex={receiptIndexMap.get(selected.id) ?? null}
           userId={userId}
           onClose={() => setSelected(null)}
         />
@@ -293,11 +342,13 @@ export default function DocumentsGrid({
 function DocumentDetailModal({
   doc,
   bill,
+  receiptIndex,
   userId,
   onClose,
 }: {
   doc: DocRecord;
   bill: BillRec | null;
+  receiptIndex: number | null;
   userId: string;
   onClose: () => void;
 }) {
@@ -340,6 +391,8 @@ function DocumentDetailModal({
         (new Date(bill.dueDate).getTime() - nowMs) / (1000 * 60 * 60 * 24),
       )
     : null;
+  const displayName = resolveDocName(doc, receiptIndex);
+  const serviceName = normalizeServiceName(doc);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -369,7 +422,7 @@ function DocumentDetailModal({
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="font-semibold">
-              {doc.serviceName ?? doc.originalFilename}
+              {displayName}
             </h2>
             <p className="mt-0.5 truncate text-xs text-[hsl(var(--muted-ink))]">
               {doc.originalFilename} ·{" "}
@@ -416,8 +469,8 @@ function DocumentDetailModal({
 
           {/* General info */}
           <div className="grid grid-cols-2 gap-2">
-            {doc.serviceName && (
-              <InfoTile label="Service / Provider" value={doc.serviceName} />
+            {serviceName && (
+              <InfoTile label="Service / Provider" value={serviceName} />
             )}
             {doc.categoryHint && (
               <InfoTile label="Category" value={doc.categoryHint} />

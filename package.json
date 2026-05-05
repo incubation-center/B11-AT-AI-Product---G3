@@ -12,7 +12,6 @@
     "@google/generative-ai": "^0.24.1",
     "@hezos/aba-payway-sdk": "^0.1.0",
     "@neondatabase/serverless": "^1.0.2",
-    "bakong-khqr": "^1.0.20",
     "better-auth": "^1.5.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

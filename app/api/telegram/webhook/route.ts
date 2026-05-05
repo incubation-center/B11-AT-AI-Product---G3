@@ -1,17 +1,132 @@
 import { NextResponse } from "next/server";
 import { consumeTelegramLinkToken, upsertTelegramLink, resolveUserIdFromTelegram } from "@/lib/telegram-linking";
 import { readBillRecords } from "@/lib/ai/rag-core";
+import { ingestDocumentForUser, type IngestDocumentResult } from "@/lib/ai/document-ingestion";
 
 export const dynamic = "force-dynamic";
 
 async function sendMessage(chatId: string | number, text: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
   if (!token) return;
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
   });
+
+  if (!response.ok) {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+  }
+}
+
+function getTelegramToken(): string {
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) {
+    throw new Error("TELEGRAM_BOT_TOKEN is missing");
+  }
+  return token;
+}
+
+async function getTelegramFilePath(fileId: string): Promise<string> {
+  const token = getTelegramToken();
+  const response = await fetch(
+    `https://api.telegram.org/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`,
+  );
+  const payload = (await response.json()) as {
+    ok?: boolean;
+    result?: { file_path?: string };
+    description?: string;
+  };
+
+  if (!response.ok || !payload.ok || !payload.result?.file_path) {
+    throw new Error(payload.description ?? "Failed to resolve Telegram file");
+  }
+
+  return payload.result.file_path;
+}
+
+async function downloadTelegramFile(params: {
+  fileId: string;
+  filename: string;
+  mimeType: string;
+}): Promise<File> {
+  const token = getTelegramToken();
+  const filePath = await getTelegramFilePath(params.fileId);
+  const response = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to download Telegram file");
+  }
+
+  const blob = await response.blob();
+  const mimeType =
+    response.headers.get("content-type")?.split(";")[0] ||
+    params.mimeType ||
+    blob.type ||
+    "application/octet-stream";
+
+  return new File([blob], params.filename, { type: mimeType });
+}
+
+function getUploadFromMessage(message: NonNullable<TelegramUpdate["message"]>) {
+  if (message.photo?.length) {
+    const largestPhoto = [...message.photo].sort(
+      (a, b) => (b.file_size ?? 0) - (a.file_size ?? 0),
+    )[0];
+
+    return {
+      fileId: largestPhoto.file_id,
+      filename: `telegram-photo-${message.message_id}.jpg`,
+      mimeType: "image/jpeg",
+    };
+  }
+
+  const document = message.document;
+  if (
+    document?.file_id &&
+    (document.mime_type?.startsWith("image/") ||
+      document.mime_type === "application/pdf")
+  ) {
+    return {
+      fileId: document.file_id,
+      filename: document.file_name ?? `telegram-document-${message.message_id}`,
+      mimeType: document.mime_type ?? "application/octet-stream",
+    };
+  }
+
+  return null;
+}
+
+function formatIngestResult(result: IngestDocumentResult): string {
+  if (result.status === "skipped") {
+    return result.message ?? "I scanned the file, but nothing was saved.";
+  }
+
+  const bill = result.bill_record;
+  if (bill) {
+    const dueDate = bill.dueDate ? `\nDue date: ${bill.dueDate}` : "";
+    const recurrence = bill.isRecurring ? "Recurring" : "One-time";
+    return [
+      "*Scan complete*",
+      `Service: ${bill.serviceName}`,
+      `Amount: ${bill.currency === "KHR" ? "KHR " : "$"}${bill.amount.toFixed(2)}`,
+      `Type: ${recurrence}`,
+      dueDate.trim(),
+      "",
+      "Saved to your account.",
+    ].filter(Boolean).join("\n");
+  }
+
+  return [
+    "*Scan complete*",
+    `Document type: ${result.doc_type ?? "document"}`,
+    result.service_name ? `Service: ${result.service_name}` : "",
+    "Saved to your account.",
+  ].filter(Boolean).join("\n");
 }
 
 function formatCurrency(amount: number): string {
@@ -39,14 +154,14 @@ export async function POST(request: Request) {
     const update = (await request.json()) as TelegramUpdate;
     const message = update.message;
 
-    if (!message?.text) {
+    if (!message) {
       return NextResponse.json({ ok: true });
     }
 
     const chatId = message.chat.id;
     const from = message.from;
-    const text = message.text.trim();
-    const command = text.split(/\s+/)[0].toLowerCase();
+    const text = message.text?.trim() ?? "";
+    const command = text ? text.split(/\s+/)[0].toLowerCase() : "";
 
     // /start <token>
     if (command === "/start") {
@@ -90,6 +205,28 @@ export async function POST(request: Request) {
 
     const bills = await readBillRecords();
     const userBills = bills.filter((b) => b.userId === userId);
+
+    const upload = getUploadFromMessage(message);
+    if (upload) {
+      await sendMessage(chatId, "Scanning your document...");
+      try {
+        const file = await downloadTelegramFile(upload);
+        const result = await ingestDocumentForUser({ userId, file });
+        await sendMessage(chatId, formatIngestResult(result));
+      } catch (error) {
+        console.error("Telegram image scan error:", error);
+        await sendMessage(
+          chatId,
+          "I could not scan that file. Please send a clear JPG, PNG, WebP, or PDF invoice.",
+        );
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (!text) {
+      await sendMessage(chatId, "Send an invoice image, or use /upcoming, /services, or /add.");
+      return NextResponse.json({ ok: true });
+    }
 
     // /upcoming — bills due in next 7 days
     if (command === "/upcoming") {
@@ -152,6 +289,20 @@ type TelegramUpdate = {
     message_id: number;
     text?: string;
     chat: { id: number; type: string };
+    photo?: Array<{
+      file_id: string;
+      file_unique_id: string;
+      width: number;
+      height: number;
+      file_size?: number;
+    }>;
+    document?: {
+      file_id: string;
+      file_unique_id: string;
+      file_name?: string;
+      mime_type?: string;
+      file_size?: number;
+    };
     from?: {
       id: number;
       username?: string;

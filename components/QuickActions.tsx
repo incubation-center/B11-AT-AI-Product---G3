@@ -71,7 +71,7 @@ export default function QuickActions({ userId }: { userId: string }) {
         onClick={() => setModal("contract")}
         className="w-full rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--surface))] p-4 text-left transition hover:bg-[hsl(var(--bg))] hover:border-[hsl(var(--primary)/0.4)]"
       >
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 cursor-pointer">
           <Upload className="h-4 w-4 text-[hsl(var(--primary))]" />
           <h3 className="font-semibold">Upload Document</h3>
         </div>
@@ -328,7 +328,7 @@ function UploadModal({
                 type="submit"
                 variant="outline"
                 disabled={!file || isLoading}
-                className="w-full"
+                className="w-full cursor-pointer"
               >
                 {isLoading ? (
                   <span className="flex items-center gap-2">
